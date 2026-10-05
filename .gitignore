@@ -1,0 +1,7 @@
+.DS_Store
+.claude/
+*.npy
+*.jpg.bak
+tools/pipeline/photo.jpg
+tools/pipeline/*.png
+__pycache__/

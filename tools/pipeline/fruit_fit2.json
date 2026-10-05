@@ -1,0 +1,50 @@
+[
+ {
+  "name": "L_topleft",
+  "cx": 83.23,
+  "cy": 378.41,
+  "r_outer": 11.83
+ },
+ {
+  "name": "L_topright",
+  "cx": 211.88,
+  "cy": 397.43,
+  "r_outer": 10.83
+ },
+ {
+  "name": "L_botleft",
+  "cx": 54.73,
+  "cy": 477.79,
+  "r_outer": 11.89
+ },
+ {
+  "name": "L_botright",
+  "cx": 250.18,
+  "cy": 493.0,
+  "r_outer": 11.1
+ },
+ {
+  "name": "R_top",
+  "cx": 338.34,
+  "cy": 322.09,
+  "r_outer": 10.61
+ },
+ {
+  "name": "R_left",
+  "cx": 307.14,
+  "cy": 401.06,
+  "r_outer": 13.16
+ },
+ {
+  "name": "R_right",
+  "cx": 412.56,
+  "cy": 390.82,
+  "r_outer": 12.24
+ },
+ {
+  "name": "R_bot",
+  "cx": 392.12,
+  "cy": 482.9,
+  "r_outer": 11.79
+ }
+]
