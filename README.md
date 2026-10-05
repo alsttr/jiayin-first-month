@@ -115,4 +115,5 @@ js/art.js             the digitised drawing (generated)
 assets/               icons + link-preview image
 tools/pipeline/       Python scripts used to trace the photo into vector art (photo not included)
 tools/og.html         source for the link-preview image
+.github/workflows/     safety net: re-requests a Pages build if the site is ever down (switches itself off once live)
 ```
