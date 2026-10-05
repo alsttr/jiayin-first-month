@@ -68,7 +68,8 @@ Then publish the change (from this folder):
 git add -A && git commit -m "Update schedule" && git push
 ```
 
-GitHub Pages updates the live site in about a minute. Her colouring is stored on her device, so edits to
+GitHub Pages updates the live site in about a minute. (Tip: bump the `?v=2` numbers at the bottom of
+`index.html` when you change CSS/JS so phones fetch the fresh files straight away.) Her colouring is stored on her device, so edits to
 games/dates never erase what she has already coloured. (Only changing `storageKey` would start fresh.)
 
 ---
@@ -95,6 +96,8 @@ https://alsttr.github.io/jiayin-first-month/?admin
 
 * Her progress lives in her browser on her device (no accounts, no servers). If she opens it on a
   different phone/browser, that one starts from the beginning — use the backup code to move it.
+* **Open it in Safari/Chrome:** links tapped inside chat apps (Telegram, Instagram…) may open in that app's
+  built-in browser, which keeps its own separate copy. Best: open it in Safari/Chrome once and bookmark it.
 * **iPhone tip:** a site added to the Home Screen can open as its own little app with its *own* storage.
   If she wants the Home Screen icon, add it **before** she starts colouring (or move her picture over with the backup code).
 * If several days are missed, they queue up: she colours them in order and gets each day's game.

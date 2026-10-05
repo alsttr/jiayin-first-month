@@ -261,7 +261,6 @@
     $$('.ping', gPing).forEach(function (c) { c.setAttribute('r', (17 * upp).toFixed(2)); });
     var zoomed = view.w < W - 0.5;
     $('#zFit').hidden = !zoomed;
-    $('#zOut').hidden = !zoomed;
     $('#zIn').hidden = view.w <= W / MAXZ + 0.5;
   }
   function unitsPerPx() { var w = svg.clientWidth || card.clientWidth || 300; return view.w / w; }
@@ -1076,6 +1075,7 @@
     p('Locked on this device: ' + (locked.length ? locked.join(', ') : 'none yet') + '  ·  phase: ' + phase());
     var ta = document.createElement('textarea'); ta.placeholder = 'Backup code appears / paste one here'; box.appendChild(ta);
     btn('Copy backup code', function () {
+      state = mergeWithDisk();
       ta.value = btoa(unescape(encodeURIComponent(JSON.stringify({ v: 1, days: state.days, opened: state.opened }))));
       ta.select(); try { document.execCommand('copy'); } catch (e) { /* ignore */ }
       if (navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(function () { /* ignore */ });
@@ -1153,7 +1153,6 @@
     $('#saveBtn').addEventListener('click', exportPNG);
     $('#scrim').addEventListener('click', dismissTop);
     $('#zIn').addEventListener('click', function () { zoomCentre(1 / 1.7); });
-    $('#zOut').addEventListener('click', function () { zoomCentre(1.7); });
     $('#zFit').addEventListener('click', function () { animateView(fullView(), 600); });
     $('#zFocus').addEventListener('click', function () { focusToday(true); });
     document.addEventListener('keydown', function (e) {
