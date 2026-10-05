@@ -1,0 +1,30 @@
+# Safety net: if the live site isn't up (e.g. a GitHub outage cancelled a deploy),
+# ask GitHub Pages to rebuild it. Once the site is live, this check switches itself off.
+name: Ensure site is live
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+permissions:
+  pages: write
+  actions: write
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the site; rebuild if it is down
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SITE: https://alsttr.github.io/jiayin-first-month/
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$SITE?check=$RANDOM")
+          echo "Site returned HTTP $code"
+          if [ "$code" = "200" ]; then
+            echo "Site is live - switching this check off."
+            gh workflow disable ensure-pages.yml -R "$GITHUB_REPOSITORY" || true
+          else
+            echo "Site not live yet - requesting a GitHub Pages build."
+            gh api -X POST "repos/$GITHUB_REPOSITORY/pages/builds" || true
+          fi
