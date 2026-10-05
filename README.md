@@ -95,6 +95,8 @@ https://alsttr.github.io/jiayin-first-month/?admin
 
 * Her progress lives in her browser on her device (no accounts, no servers). If she opens it on a
   different phone/browser, that one starts from the beginning — use the backup code to move it.
+* **iPhone tip:** a site added to the Home Screen can open as its own little app with its *own* storage.
+  If she wants the Home Screen icon, add it **before** she starts colouring (or move her picture over with the backup code).
 * If several days are missed, they queue up: she colours them in order and gets each day's game.
 * If the page is open at 6pm, the new spot unlocks live with a little celebration.
 * At the end she can **Save picture** (PNG of the finished drawing, numbers removed).

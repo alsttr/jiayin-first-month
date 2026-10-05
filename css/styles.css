@@ -317,6 +317,18 @@ body.has-pv .app { padding-top: calc(env(safe-area-inset-top) + 30px); }
   :root { --dock-h: 0px; }
 }
 
+/* phones held sideways */
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 560px) {
+  .app { display: grid; grid-template-columns: 1fr minmax(300px, 360px); grid-template-rows: auto 1fr; column-gap: 14px; padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  .top { grid-column: 1 / -1; min-height: 0; padding: 6px 8px 0; }
+  .title { font-size: 18px; }
+  .beads { margin-top: 4px; }
+  .stage { grid-column: 1; grid-row: 2; padding: 14px 0 8px; }
+  .dock { grid-column: 2; grid-row: 2; align-self: center; height: 214px; margin: 0 0 8px; border-radius: var(--r-lg); padding-bottom: 0; box-shadow: var(--shadow); }
+  .pane { inset: 0; }
+  .toast { bottom: 16px; }
+}
+
 /* short phones */
 @media (max-height: 640px) {
   :root { --dock-h: 182px; --hdr-h: 64px; }
