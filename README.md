@@ -55,11 +55,10 @@ never straight into the day's puzzle (so nothing starts by surprise — TimeGues
 
 ### How the drawing was mapped
 * Numbers were read from the photo. The fruits are tiny, so these are best readings:
-  **8** = lowest fruit on the right tree · **9** = lower-right fruit on the left tree + left fruit on the right tree ·
+  **8** = lowest fruit on the right tree · **9** = lower-right fruit on the left tree + left and top fruits on the right tree ·
   **10** = two upper fruits on the left tree + right fruit on the right tree · **11** = lower-left fruit on the left tree.
-* Unnumbered parts went to the nearest sensible number: the top fruit of the right tree → 9 (nearest fruit),
-  flower petals → their flower's number, stems → the nearest leaf, the bits of sky between/behind the trees → 21 (sky),
-  the slivers of the back tree peeking through → 7.
+* Unnumbered parts went to the nearest sensible number: flower petals → their flower's number, stems → the nearest leaf,
+  the bits of sky between/behind the trees → 21 (sky), the slivers of the back tree peeking through → 7.
 * Clouds stay white (they can't be coloured).
 * Any of this can be changed in `js/config.js` → `regions`.
 
@@ -87,7 +86,7 @@ Then publish the change (from this folder):
 git add -A && git commit -m "Update schedule" && git push
 ```
 
-GitHub Pages updates the live site in about a minute. (Tip: bump the `?v=5` numbers in `index.html`
+GitHub Pages updates the live site in about a minute. (Tip: bump the `?v=6` numbers in `index.html`
 when you change CSS/JS so phones fetch the fresh files straight away.) Edits to games/dates never erase what she has already
 coloured — that lives in the database (and on her phone).
 

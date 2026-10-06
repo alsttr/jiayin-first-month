@@ -1492,8 +1492,14 @@
     var a = document.createElement('a'); a.href = P.url; a.target = '_blank'; a.rel = 'noopener';
     a.textContent = k >= 0 ? P.link : t;
     h.textContent = '';
-    if (k >= 0) { h.appendChild(document.createTextNode(t.slice(0, k))); h.appendChild(a); h.appendChild(document.createTextNode(t.slice(k + P.link.length))); }
-    else h.appendChild(a);
+    if (k >= 0) {   // the name (and the "!" after it) stays on one line
+      var rest = t.slice(k + P.link.length), tail = rest.match(/^\S*/)[0];
+      var nb = document.createElement('span'); nb.className = 'nb';
+      nb.appendChild(a); if (tail) nb.appendChild(document.createTextNode(tail));
+      h.appendChild(document.createTextNode(t.slice(0, k))); h.appendChild(nb);
+      if (rest.length > tail.length) h.appendChild(document.createTextNode(rest.slice(tail.length)));
+      if (nb.getBoundingClientRect().width > h.clientWidth + 1) nb.className = '';   // a name too long for one line may wrap
+    } else h.appendChild(a);
     var bl = $('#pzBlurb'); bl.textContent = P.blurb || ''; bl.hidden = !P.blurb;
     $('#pzGo').href = P.url; $('#pzGoLbl').textContent = P.go || 'Take a look';
     var box = $('#prize'), shot = $('#pzShot');

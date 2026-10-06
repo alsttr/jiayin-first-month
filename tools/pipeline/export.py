@@ -18,7 +18,7 @@ SEEDS = {
     'fruit_L2': (211.9, 397.4),  # left tree, upper-right
     'fruit_L3': (54.7, 477.8),   # left tree, lower-left
     'fruit_L4': (250.2, 493.0),  # left tree, lower-right
-    'fruit_R1': (338.3, 322.1),  # right tree, top (unnumbered in the drawing)
+    'fruit_R1': (338.3, 322.1),  # right tree, top (a 9)
     'fruit_R2': (306.6, 398.6),  # right tree, left
     'fruit_R3': (412.6, 390.8),  # right tree, right
     'fruit_R4': (392.1, 482.9),  # right tree, bottom
@@ -150,6 +150,7 @@ LABELS = [
     ('flower_big_centre', 88, 946.5, 13), ('flower_small_petals', 171.5, 1002, 16),
     ('ground', 483.5, 768.5, 28), ('tulip_leaf_left', 336.5, 1166.8, 22), ('tulip_leaf_right', 395, 1136.5, 23),
     ('daisy_centre', 583, 886.5, 19), ('sky', 457.5, 570.5, 30),
+    ('fruit_R1', 338.3, 322.1, 10.5),   # the right tree's top berry is a 9 too (added last so the others keep their look)
 ]
 labels = [dict(region=r, x=x, y=y, size=s) for r, x, y, s in LABELS]
 

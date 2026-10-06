@@ -75,7 +75,7 @@ window.CONFIG = {
     canopy_left: 6,
     canopy_right: 7, canopy_right_nook: 7, canopy_right_strip: 7,   // the bits of the back tree peeking through
     fruit_R4: 8,                                    // right tree, lowest fruit
-    fruit_L4: 9, fruit_R2: 9, fruit_R1: 9,          // R1 (top of right tree) had no number → nearest fruit (9)
+    fruit_L4: 9, fruit_R2: 9, fruit_R1: 9,          // R1 = the top berry of the right tree
     fruit_L1: 10, fruit_L2: 10, fruit_R3: 10,
     fruit_L3: 11,
     hill: 12,
