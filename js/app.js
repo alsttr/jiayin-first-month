@@ -32,16 +32,16 @@
   var params = new URLSearchParams(location.search);
   // Which version of the page this is:
   //   real    — her picture: locked-in days are saved online (when CONFIG.sync is set)
-  //   test    — ?test  : everything unlocked, nothing saved online, separate sandbox on this device
+  //   test    — ?test  : a pretend clock you can skip forward, nothing saved online, separate sandbox on this device
   //   preview — ?preview=YYYY-MM-DDTHH:MM : pretend it's that Singapore time, separate sandbox, nothing saved online
   //   view    — ?view  : read-only look at her saved picture
   var MODE = params.has('test') ? 'test' : params.has('preview') ? 'preview' : params.has('view') ? 'view' : 'real';
   var PREVIEW = MODE === 'preview' ? parsePreview(params.get('preview')) : null;
   if (MODE === 'preview' && PREVIEW == null) PREVIEW = Date.now();   // unreadable date: sandbox at the real time
-  var TEST_NOW = 0;   // set once the schedule is known (just after the last unlock)
+  var clock = null;   // test page: { s: pretend time, r: real time when it was set } — keeps running, survives reloads
   var t0 = Date.now();
   function now() {
-    if (MODE === 'test') return TEST_NOW + (Date.now() - t0);
+    if (clock) return clock.s + (Date.now() - clock.r);
     return PREVIEW != null ? PREVIEW + (Date.now() - t0) : Date.now();
   }
   function parsePreview(s) {
@@ -76,7 +76,6 @@
     .sort(function (a, b) { return a.n - b.n; });
   var DAY = {}; DAYS.forEach(function (d) { DAY[d.n] = d; });
   var TOTAL = DAYS.length;
-  TEST_NOW = (DAYS.length ? DAYS[DAYS.length - 1].at : Date.now()) + 3600 * 1000;
 
   var REG = {};
   A.regions.forEach(function (r) {
@@ -146,6 +145,23 @@
       if (v === undefined) return localStorage.getItem('jfm-pref:' + k);
       localStorage.setItem('jfm-pref:' + k, v);
     } catch (e) { return null; }
+  }
+
+  // The test page's pretend clock (so the waiting/locked screens can be tried, then skipped)
+  function readClock() {
+    try { var c = JSON.parse(localStorage.getItem(KEY + ':clock')); if (c && isFinite(c.s) && isFinite(c.r)) return c; } catch (e) { /* ignore */ }
+    return null;
+  }
+  function setClock(ms) {
+    clock = { s: ms, r: Date.now() };
+    try { localStorage.setItem(KEY + ':clock', JSON.stringify(clock)); } catch (e) { /* ignore */ }
+  }
+  if (MODE === 'test') {
+    clock = readClock();
+    if (!clock) {   // a fresh test page starts as the next spot unlocks (or right now, if that's later)
+      var first = currentDay();
+      setClock(first ? Math.max(Date.now(), first.at + 1500) : Date.now());
+    }
   }
 
   /* ======================================================================
@@ -300,7 +316,7 @@
      ====================================================================== */
   var svg = $('#art'), card = $('#card'), stage = $('#stage');
   var hitCtx = document.createElement('canvas').getContext('2d');
-  var defs, gFill, gFx, gStroke, gHl, gInk, gNum, gPing;
+  var defs, gFill, gFx, gStroke, gSel, gHl, gInk, gNum, gPing;
   var dayGroups = {};
 
   function buildArt() {
@@ -311,8 +327,9 @@
     gFx = mk('g', { class: 'fx' }, svg);
     gStroke = mk('g', { class: 'strokes' }, svg);
     gHl = mk('g', { class: 'hls' }, svg);
+    gSel = mk('g', { class: 'sels' }, svg);
     gInk = mk('g', { class: 'ink', fill: 'none', stroke: INK, 'stroke-width': 3.1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
-    gNum = mk('g', { class: 'nums' }, svg);
+    gNum = mk('g', { class: 'nums', fill: 'none', stroke: INK, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
     gPing = mk('g', { class: 'pings' }, svg);
 
     Object.keys(REG).forEach(function (id) {
@@ -326,14 +343,92 @@
       var cp = mk('clipPath', { id: 'cd-' + n }, defs);
       DAY_REGIONS[n].forEach(function (id) { mk('path', { d: REG[id].d, 'clip-rule': 'evenodd' }, cp); });
     });
-    A.lines.forEach(function (d) { mk('path', { d: d }, gInk); });
-    A.circles.forEach(function (c) { mk('circle', { cx: c.cx, cy: c.cy, r: c.r }, gInk); });
-    A.labels.forEach(function (l) {
-      var r = REG[l.region]; if (!r || r.n == null) return;
-      var t = mk('text', { x: l.x, y: l.y, dy: '.36em', 'font-size': (l.size * 1.32).toFixed(1), class: 'num' }, gNum);
-      t.textContent = r.n;
-      r.label = t;
+    A.lines.forEach(function (d) {
+      mk('path', { d: d }, gInk);
+      var v = d.match(/-?\d*\.?\d+/g) || [], bb = [1e9, 1e9, -1e9, -1e9];
+      for (var i = 0; i + 1 < v.length; i += 2) { bb[0] = Math.min(bb[0], +v[i]); bb[1] = Math.min(bb[1], +v[i + 1]); bb[2] = Math.max(bb[2], +v[i]); bb[3] = Math.max(bb[3], +v[i + 1]); }
+      try { INKS.push({ p: new Path2D(d), bb: bb }); } catch (e) { /* ignore */ }
     });
+    A.circles.forEach(function (c) {
+      mk('circle', { cx: c.cx, cy: c.cy, r: c.r }, gInk);
+      INKS.push({ c: c, bb: [c.cx - c.r, c.cy - c.r, c.cx + c.r, c.cy + c.r] });
+    });
+    A.labels.forEach(function (l, i) {
+      var r = REG[l.region]; if (!r || r.n == null) return;
+      if (HAND) {   // the number in the handwriting from the real card, as pen strokes
+        var f = fitNumber(r, String(r.n), l.x, l.y, l.size * 0.86, i + 1);
+        r.label = mk('path', { d: f.strokes.map(strokeD).join(''), class: 'num', 'stroke-width': f.pen.toFixed(2) }, gNum);
+      } else {
+        var t = mk('text', { x: l.x, y: l.y, dy: '.36em', 'font-size': (l.size * 1.32).toFixed(1), class: 'num txt', stroke: 'none' }, gNum);
+        t.textContent = r.n;
+        r.label = t;
+      }
+    });
+  }
+
+  // Lay out a number from the traced digit strokes, centred on (x, y), `h` units tall.
+  // Each copy is tilted/sized a touch differently (but the same every time) so repeats don't look stamped.
+  var HAND = window.HAND && window.HAND.glyphs;
+  function penFor(h) { return clamp(0.9 + h * 0.08, 1.5, 2.8); }
+  function handStrokes(text, x, y, h, seed) {
+    var s = (seed * 9301 + 49297) % 233280;
+    function rnd() { s = (s * 9301 + 49297) % 233280; return s / 233280; }
+    var keys = text.split('').map(function (ch) {
+      if (text.length === 1 && ch === '1' && HAND['1f']) return '1f';      // the sun's flagged 1
+      if (text.length > 1 && ch === '2' && HAND['2b']) return '2b';        // the narrower 2 from "21"
+      return ch;
+    });
+    var gl = keys.map(function (k) { return HAND[k]; }).filter(Boolean);
+    var gap = 0.2 * h;
+    var widths = gl.map(function (g) { return g.w * h; });
+    var total = widths.reduce(function (a, b) { return a + b; }, 0) + gap * (gl.length - 1);
+    var rot = (rnd() - 0.5) * 0.1, cos = Math.cos(rot), sin = Math.sin(rot);
+    var out = [], cx = -total / 2;
+    gl.forEach(function (g, i) {
+      var sc = h * (0.96 + rnd() * 0.08) / 1000;
+      var ox = cx + widths[i] / 2, oy = (rnd() - 0.5) * 0.06 * h;
+      g.s.forEach(function (st) {
+        var p = [];
+        for (var j = 0; j < st.length; j += 2) {
+          var lx = ox + st[j] * sc, ly = oy + st[j + 1] * sc;
+          p.push(r1(x + lx * cos - ly * sin), r1(y + lx * sin + ly * cos));
+        }
+        out.push(p);
+      });
+      cx += widths[i] + gap;
+    });
+    return out;
+  }
+  // A number must keep clear of the lines of its own spot: nudge it a little, or write it a little smaller
+  var NUDGE = [[0, 0], [1.5, 0], [-1.5, 0], [0, 1.5], [0, -1.5], [3, 0], [-3, 0], [0, 3], [0, -3], [2, 2], [-2, 2], [2, -2], [-2, -2]];
+  var INKS = [];   // the drawn lines (with their bounding boxes), so numbers can keep clear of them
+  function fitNumber(r, text, x, y, h, seed) {
+    var roomy = r.p2d && hitCtx.isPointInPath(r.p2d, x, y, 'evenodd');
+    var near = INKS.filter(function (k) { return k.bb[0] < x + 2.2 * h && k.bb[2] > x - 2.2 * h && k.bb[1] < y + 1.2 * h && k.bb[3] > y - 1.2 * h; });
+    var scales = roomy ? [1, 0.92, 0.85, 0.78, 0.72, 0.66] : [1];
+    for (var i = 0; i < scales.length; i++) {
+      var hh = h * scales[i], pen = penFor(hh), gap = 1.55 + pen / 2 + 1.5;   // half the outline + half the pen + a clear gap
+      for (var k = 0; k < (roomy ? NUDGE.length : 1); k++) {
+        var strokes = handStrokes(text, x + NUDGE[k][0], y + NUDGE[k][1], hh, seed);
+        if (!roomy || inside(r, near, strokes, gap)) return { strokes: strokes, pen: pen };
+      }
+    }
+    return { strokes: handStrokes(text, x, y, h * 0.66, seed), pen: penFor(h * 0.66) };
+  }
+  function inside(r, near, strokes, margin) {
+    hitCtx.lineWidth = 2 * margin;
+    for (var i = 0; i < strokes.length; i++) {
+      var p = strokes[i];
+      for (var j = 0; j < p.length; j += 4) {   // every other point is close enough
+        var x = p[j], y = p[j + 1];
+        if (!hitCtx.isPointInPath(r.p2d, x, y, 'evenodd') || hitCtx.isPointInStroke(r.p2d, x, y)) return false;
+        for (var k = 0; k < near.length; k++) {
+          var c = near[k].c;
+          if (c ? Math.abs(Math.hypot(x - c.cx, y - c.cy) - c.r) < margin : hitCtx.isPointInStroke(near[k].p, x, y)) return false;
+        }
+      }
+    }
+    return true;
   }
 
   function dayGroup(n) {
@@ -513,30 +608,137 @@
   var colour = pref('colour') || C.palette[0];
   var sizeIdx = +(pref('size') || 1);
 
+  // the "+" bubble first, then her own mixed colours, then the palette
   function buildPalette() {
     var pal = $('#palette');
     pal.textContent = '';
-    C.palette.forEach(function (c) {
+    var cb = document.createElement('button');
+    cb.className = 'sw custom'; cb.setAttribute('aria-label', 'Mix your own colour'); cb.title = 'Mix your own colour';
+    cb.addEventListener('click', function () { squish(cb); openMixer(); });
+    pal.appendChild(cb);
+    recentColours().concat(C.palette).forEach(function (c) {
       var b = document.createElement('button');
       b.className = 'sw'; b.style.background = c; b.setAttribute('role', 'radio'); b.setAttribute('aria-label', 'Colour ' + c); b.dataset.c = c;
       b.addEventListener('click', function () { setColour(c); squish(b); });
       pal.appendChild(b);
     });
-    var cb = document.createElement('label');
-    cb.className = 'sw custom'; cb.setAttribute('aria-label', 'Pick any colour'); cb.title = 'Any colour';
-    var inp = document.createElement('input'); inp.type = 'color'; inp.value = isHex(colour) ? colour : '#ff8fab';
-    inp.addEventListener('input', function () { setColour(inp.value, true); });
-    inp.addEventListener('change', function () { setColour(inp.value, true); });
-    cb.appendChild(inp);
-    pal.appendChild(cb);
-    setColour(colour, C.palette.indexOf(colour) < 0);
+    setColour(colour);
   }
   function isHex(c) { return /^#[0-9a-f]{6}$/i.test(c); }
-  function setColour(c, custom) {
+  function setColour(c) {
     colour = c; pref('colour', c);
-    $$('.sw', $('#palette')).forEach(function (b) { b.classList.toggle('on', !custom && b.dataset.c === c); b.setAttribute('aria-checked', String(!custom && b.dataset.c === c)); });
+    var found = false;
+    $$('.sw[data-c]', $('#palette')).forEach(function (b) {
+      var on = !found && b.dataset.c.toLowerCase() === String(c).toLowerCase();
+      if (on) found = true;
+      b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on));
+    });
     var cb = $('.sw.custom');
-    if (cb) { cb.classList.toggle('on', !!custom); cb.style.boxShadow = custom ? '0 0 0 2.5px #fff, 0 0 0 5px ' + c : ''; }
+    if (cb) { cb.classList.toggle('on', !found); cb.style.boxShadow = found ? '' : '0 0 0 2.5px #fff, 0 0 0 5px ' + c; }
+  }
+  function recentColours() {
+    var out = [];
+    try { out = JSON.parse(pref('recent') || '[]'); } catch (e) { out = []; }
+    return (Array.isArray(out) ? out : []).filter(function (c) {
+      return isHex(c) && !C.palette.some(function (p) { return p.toLowerCase() === c.toLowerCase(); });
+    }).slice(0, 6);
+  }
+
+  /* ---- mix your own colour: drag across the rainbow (light at the top, deep at the bottom),
+     the slider below goes from soft to bold. Always gives a plain #RRGGBB colour. ---- */
+  var LIGHT_A = 0.86, DARK_A = 0.62;   // how far the field fades to white (top) and to deep (bottom)
+  var mix = { h: 340, s: 0.72, l: 0.76, open: false, prev: null, drag: null };
+  function hsl2hex(h, s, l) {
+    h = ((h % 360) + 360) % 360;
+    var c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2, rgb;
+    if (h < 60) rgb = [c, x, 0]; else if (h < 120) rgb = [x, c, 0]; else if (h < 180) rgb = [0, c, x];
+    else if (h < 240) rgb = [0, x, c]; else if (h < 300) rgb = [x, 0, c]; else rgb = [c, 0, x];
+    return '#' + rgb.map(function (v) { return ('0' + Math.round(clamp(v + m, 0, 1) * 255).toString(16)).slice(-2); }).join('').toUpperCase();
+  }
+  function hex2hsl(hex) {
+    var r = parseInt(hex.substr(1, 2), 16) / 255, g = parseInt(hex.substr(3, 2), 16) / 255, b = parseInt(hex.substr(5, 2), 16) / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn, h = 0, s = 0;
+    if (d) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      h = mx === r ? 60 * (((g - b) / d) % 6) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+    }
+    return { h: (h + 360) % 360, s: clamp(s, 0, 1), l: l };
+  }
+  function yToL(y) { return y < 0.5 ? 0.5 + 0.5 * LIGHT_A * (1 - 2 * y) : 0.5 - 0.5 * DARK_A * (2 * y - 1); }
+  function lToY(l) { return l >= 0.5 ? clamp((1 - (l - 0.5) / (0.5 * LIGHT_A)) / 2, 0, 0.5) : clamp(0.5 + (0.5 - l) / (0.5 * DARK_A) / 2, 0.5, 1); }
+  function mixColour() { return hsl2hex(mix.h, mix.s, mix.l); }
+  function paintMixer() {
+    var c = mixColour(), sp = Math.round(mix.s * 100) + '%', lp = (mix.l * 100).toFixed(1) + '%';
+    var stops = [];
+    for (var i = 0; i <= 12; i++) stops.push('hsl(' + i * 30 + ',' + sp + ',50%) ' + (i / 12 * 100).toFixed(2) + '%');
+    $('#mxField').style.background = 'linear-gradient(to bottom, rgba(255,255,255,' + LIGHT_A + '), rgba(255,255,255,0) 50%, rgba(0,0,0,0) 50%, rgba(0,0,0,' + DARK_A + ')), linear-gradient(to right, ' + stops.join(', ') + ')';
+    var k = $('#mxKnob'); k.style.left = (mix.h / 360 * 100) + '%'; k.style.top = (lToY(mix.l) * 100) + '%'; k.style.background = c;
+    $('#mxSat').style.background = 'linear-gradient(to right, hsl(' + Math.round(mix.h) + ',0%,' + lp + '), hsl(' + Math.round(mix.h) + ',100%,' + lp + '))';
+    var sk = $('#mxSatKnob'); sk.style.left = (mix.s * 100) + '%'; sk.style.background = c;
+    var ok = $('#mxOk'); ok.style.background = c; ok.style.color = contrastInk(c);
+    $('#mxField').setAttribute('aria-valuetext', c);
+    $('#mxSat').setAttribute('aria-valuenow', String(Math.round(mix.s * 100)));
+    colour = c;   // she can paint with it straight away
+  }
+  function openMixer() {
+    if (mix.open || !canColour()) return;
+    mix.open = true; mix.prev = colour;
+    if (isHex(colour)) {
+      var p = hex2hsl(colour);
+      if (p.s > 0.08) { mix.h = p.h; mix.s = clamp(p.s, 0.25, 1); mix.l = clamp(p.l, yToL(1), yToL(0)); }
+    }
+    $('.colour-pane').classList.add('mixing');
+    $('#mixer').setAttribute('aria-hidden', 'false');
+    paintMixer();
+    updatePrompt();
+    setTimeout(function () { try { $('#mxField').focus({ preventScroll: true }); } catch (e) { /* ignore */ } }, 60);
+  }
+  function closeMixer(keep) {
+    if (!mix.open) return;
+    mix.open = false; mix.drag = null;
+    var c = mixColour();
+    if (keep) {
+      if (!C.palette.some(function (p) { return p.toLowerCase() === c.toLowerCase(); })) {
+        var rec = recentColours().filter(function (x) { return x.toLowerCase() !== c.toLowerCase(); });
+        rec.unshift(c);
+        pref('recent', JSON.stringify(rec.slice(0, 6)));
+      }
+      buildPalette();
+      setColour(c);
+    } else setColour(mix.prev || colour);
+    var pane = $('.colour-pane');
+    pane.classList.remove('mixing');
+    pane.classList.add('unmixed'); setTimeout(function () { pane.classList.remove('unmixed'); }, 600);
+    $('#mixer').setAttribute('aria-hidden', 'true');
+    updatePrompt();
+  }
+  function mixPointer(el, which) {
+    function at(e) {
+      var r = el.getBoundingClientRect();
+      var x = clamp((e.clientX - r.left) / r.width, 0, 1), y = clamp((e.clientY - r.top) / r.height, 0, 1);
+      if (which === 'field') { mix.h = x * 359.9; mix.l = yToL(y); } else mix.s = x;
+      paintMixer();
+    }
+    el.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      mix.drag = which; at(e); e.preventDefault();
+    });
+    el.addEventListener('pointermove', function (e) { if (mix.drag === which) at(e); });
+    el.addEventListener('pointerup', function () { mix.drag = null; });
+    el.addEventListener('pointercancel', function () { mix.drag = null; });
+    el.addEventListener('keydown', function (e) {
+      var k = e.key, used = true;
+      if (which === 'field' && k === 'ArrowLeft') mix.h = (mix.h + 354) % 360;
+      else if (which === 'field' && k === 'ArrowRight') mix.h = (mix.h + 6) % 360;
+      else if (which === 'field' && k === 'ArrowUp') mix.l = clamp(mix.l + 0.03, yToL(1), yToL(0));
+      else if (which === 'field' && k === 'ArrowDown') mix.l = clamp(mix.l - 0.03, yToL(1), yToL(0));
+      else if (which === 'sat' && (k === 'ArrowLeft' || k === 'ArrowDown')) mix.s = clamp(mix.s - 0.05, 0, 1);
+      else if (which === 'sat' && (k === 'ArrowRight' || k === 'ArrowUp')) mix.s = clamp(mix.s + 0.05, 0, 1);
+      else if (k === 'Enter') { closeMixer(true); }
+      else used = false;
+      if (used) { e.preventDefault(); if (mix.open) paintMixer(); }
+    });
   }
   function squish(el) {
     if (reduceMotion || !el.animate) return;
@@ -679,7 +881,8 @@
     $('#dayTag').textContent = 'Day ' + cur.n;
     var ids = todayIds(), total = ids.length, left = phase() === 'colour' ? blanksLeft() : total;
     var msg;
-    if (!total) msg = 'Nothing to colour today — tap Done!';
+    if (mix.open) msg = 'Mix your own colour 🎨';
+    else if (!total) msg = 'Nothing to colour today — tap Done!';
     else if (!hasWork()) msg = tool === 'fill' ? 'Tap the glowing spot' + (total > 1 ? 's' : '') + ' to colour' : 'Paint inside the glowing spot' + (total > 1 ? 's' : '');
     else if (left > 0) msg = left + ' glowing spot' + (left > 1 ? 's' : '') + ' left ✨';
     else msg = 'Looking lovely! Tap Done when happy';
@@ -773,9 +976,65 @@
       nudgeToday(other);
       return;
     }
-    var hit = regionsAt(a.x, a.y)[0];
-    if (hit) infoToast(hit);
+    // locked (waiting / all done / view-only): tap a coloured part to see that day's game
+    var hit = regionNear(a.x, a.y);
+    if (!hit) return;
+    var r = REG[hit];
+    if (r.n != null && isDone(r.n) && DAY[r.n]) openDay(r.n);
+    else infoToast(hit);
   }
+  // the part under the finger — or, on a line between parts, the closest one
+  function regionNear(x, y) {
+    var hit = regionsAt(x, y)[0];
+    if (hit) return hit;
+    hitCtx.lineWidth = 2 * 12 * unitsPerPx();
+    var near = Object.keys(REG).filter(function (id) { return REG[id].p2d && hitCtx.isPointInStroke(REG[id].p2d, x, y); });
+    near.sort(function (p, q) { return REG[p].area - REG[q].area; });
+    return near[0] || null;
+  }
+
+  // ---- picking a coloured day while locked ----
+  var selDay = null, hovDay = null;
+  function markDay(n, cls) {   // cls 'sel' = picked (a soft flash that stays lit), 'hov' = mouse over
+    $$('.' + cls, gSel).forEach(function (p) {
+      p.classList.remove(cls);
+      var o = +getComputedStyle(p).opacity || 0;
+      if (p.animate && !reduceMotion) p.animate([{ opacity: o }, { opacity: 0 }], { duration: 320, easing: 'ease-out', fill: 'forwards' }).onfinish = function () { p.remove(); };
+      else p.remove();
+    });
+    if (n == null) return;
+    var sel = cls === 'sel';
+    (DAY_REGIONS[n] || []).forEach(function (id) {
+      var p = mk('path', { d: REG[id].d, 'fill-rule': 'evenodd', class: cls }, gSel);
+      if (p.animate && !reduceMotion) {
+        p.animate(sel ? [{ opacity: 0 }, { opacity: 0.65, offset: 0.3 }, { opacity: 0.25 }] : [{ opacity: 0 }, { opacity: 0.2 }],
+          { duration: sel ? 900 : 220, easing: 'ease-out', fill: 'forwards' });
+      } else p.style.opacity = sel ? 0.25 : 0.2;
+    });
+  }
+  function selectDay(n) {
+    if (selDay === n) return;
+    selDay = n;
+    if (hovDay != null) { hovDay = null; markDay(null, 'hov'); }
+    markDay(n, 'sel');
+  }
+  function clearSel() { if (selDay == null) return; selDay = null; markDay(null, 'sel'); }
+  function openDay(n) {
+    selectDay(n);
+    if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) { try { navigator.vibrate(10); } catch (e) { /* ignore */ } }
+    setTimeout(function () { showReveal(n, false); }, reduceMotion ? 0 : 220);
+  }
+  // mouse hover: coloured parts light up and show a hand cursor
+  function onHover(e) {
+    if (e.pointerType !== 'mouse' || nPtrs || canColour() || anyOverlay()) return;
+    var a = toArt(e.clientX, e.clientY), id = regionsAt(a.x, a.y)[0];
+    var n = id && REG[id].n != null && isDone(REG[id].n) && DAY[REG[id].n] ? REG[id].n : null;
+    svg.style.cursor = n != null ? 'pointer' : '';
+    if (n === hovDay) return;
+    hovDay = n;
+    markDay(n === selDay ? null : n, 'hov');
+  }
+  function hoverOff() { svg.style.cursor = ''; if (hovDay != null) { hovDay = null; markDay(null, 'hov'); } }
   function nudgeToday(other) {
     var r = other && REG[other];
     if (r && r.n == null) toast('Clouds stay white ☁️');
@@ -795,8 +1054,10 @@
     if (!d) return;
     if (isDone(r.n)) {
       toast('Day ' + r.n + ' · ' + esc(fmtDate(d.at)) + ' · <a href="' + esc(d.game.url) + '" target="_blank" rel="noopener">' + esc(d.game.name) + ' ↗</a>', 3600, true);
+    } else if (d.at <= now()) {
+      toast('Spot ' + r.n + ' is up next ✨', 2600);
     } else {
-      toast('Spot ' + r.n + ' unlocks ' + esc(relDay(d.at)) + ', ' + fmtTime(d.at) + ' ✨', 2600, true);
+      toast('Spot ' + r.n + ' unlocks ' + relDay(d.at).replace(/^Today$/, 'today').replace(/^Tomorrow$/, 'tomorrow') + ' at ' + fmtTime(d.at) + ' ✨', 2600);
     }
   }
   function onWheel(e) {
@@ -868,6 +1129,8 @@
 
   function anyOverlay() { return !!$('.modal.on, .sheet.on'); }
   function openOverlay(el) {
+    var t = $('#toast');
+    if (!t.classList.contains('keep')) t.classList.remove('on');   // tips never sit on top of a sheet or popup
     $('#scrim').classList.add('on');
     el.classList.add('on');
   }
@@ -877,9 +1140,10 @@
   }
 
   var toastTimer = 0;
-  function toast(html, ms, isHtml) {
+  function toast(html, ms, isHtml, keep) {
     var t = $('#toast');
     if (isHtml) t.innerHTML = html; else t.textContent = html;
+    t.classList.toggle('keep', !!keep);
     t.classList.remove('on'); void t.offsetWidth; t.classList.add('on');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.classList.remove('on'); }, ms || 2400);
@@ -893,6 +1157,7 @@
     var cols = [];
     Object.keys(d.fills).forEach(function (k) { if (cols.indexOf(d.fills[k]) < 0) cols.push(d.fills[k]); });
     d.strokes.forEach(function (s) { if (cols.indexOf(s.c) < 0) cols.push(s.c); });
+    preloadShot(cur.n);   // so the game card shows its screenshot straight away
     var sw = $('#cfSwatches'); sw.textContent = '';
     cols.slice(0, 10).forEach(function (c) { var i = document.createElement('i'); i.style.background = c; sw.appendChild(i); });
     var left = blanksLeft(), warn = $('#cfWarn');
@@ -925,7 +1190,7 @@
     var c = centreOf(DAY_REGIONS[n] || []);
     setTimeout(function () { burst(c.x, c.y, cols, 110, 1); }, 120);
     renderBeads();
-    if (!ok) toast('Hmm, this browser won’t let me save. Is private browsing on?', 5000);
+    if (!ok) toast('Hmm, this browser won’t let me save. Is private browsing on?', 5000, false, true);
     setTimeout(function () { animateView(fullView(), 900); }, 380);
     setTimeout(function () { showReveal(n, true); }, 900);
   }
@@ -945,15 +1210,20 @@
     });
   }
 
-  // ---- reveal ----
+  // ---- the game card: revealed when a day is locked in, and again whenever she taps that day ----
   var TILE_COLS = ['#6aaa64', '#e2b93b', '#ff7f6e'];
-  function showReveal(n, fresh) {
-    var d = DAY[n]; if (!d) return;
-    var g = d.game;
-    $('#rvDay').textContent = 'Day ' + n + ' · ' + fmtDate(d.at);
-    var link = $('#rvLink'); link.textContent = g.name; link.href = g.url;
-    $('#rvPlay').href = g.url;
-    $('#rvBlurb').textContent = g.blurb || '';
+  var revealFor = null, revealFresh = false;
+  function hostOf(url) { try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } }
+  function dayColours(n) {
+    var r = record(n), cols = [];
+    if (!r) return cols;
+    function add(c) { c = String(c).toUpperCase(); if (cols.indexOf(c) < 0) cols.push(c); }
+    Object.keys(r.fills || {}).forEach(function (k) { add(r.fills[k]); });
+    (r.strokes || []).forEach(function (s) { add(s.c); });
+    return cols.slice(0, 8);
+  }
+  function preloadShot(n) { var d = DAY[n]; if (d && d.game.img) { var im = new Image(); im.src = d.game.img; } }
+  function gameTiles(g) {
     var art = $('#gameArt'); art.textContent = '';
     var letters = (g.name.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '???').slice(0, 3).split('');
     var pos = [[6, 30, -12], [26, 8, 4], [46, 32, 14]];
@@ -963,12 +1233,47 @@
       t.style.transform = 'rotate(' + pos[i][2] + 'deg)'; t.style.animationDelay = (i * 0.09) + 's';
       art.appendChild(t);
     });
+  }
+  function showShot(g) {
+    var shot = $('#rvShot'), img = $('#rvImg'), art = $('#gameArt');
+    shot.href = g.url;
+    $('#rvHost').textContent = hostOf(g.url);
+    function fallback() { shot.hidden = true; art.hidden = false; gameTiles(g); }
+    if (!g.img) { fallback(); return; }
+    shot.hidden = false; art.hidden = true;
+    if (img.getAttribute('src') !== g.img) {
+      img.classList.remove('ok');
+      img.onload = function () { img.classList.add('ok'); };
+      img.onerror = fallback;
+      img.src = g.img;
+      if (img.complete && img.naturalWidth) img.classList.add('ok');
+    }
+  }
+  function showReveal(n, fresh) {
+    var d = DAY[n]; if (!d) return;
+    var g = d.game, today = fresh || dayKey(d.at) === dayKey(now());
+    var dl = $('#rvDay'); dl.textContent = 'Day ' + n + ' · ' + fmtDate(d.at);
+    var cols = dayColours(n);
+    if (cols.length) {
+      var dots = document.createElement('span'); dots.className = 'dots';
+      cols.forEach(function (c) { var i = document.createElement('i'); i.style.background = c; dots.appendChild(i); });
+      dl.appendChild(dots);
+    }
+    var h = $('#rvTitle'); h.textContent = '';
+    var link = document.createElement('a'); link.href = g.url; link.target = '_blank'; link.rel = 'noopener'; link.textContent = g.name;
+    h.appendChild(document.createTextNode(today ? 'We’re playing ' : 'We played '));
+    h.appendChild(link);
+    h.appendChild(document.createTextNode(today ? ' today!' : '!'));
+    $('#rvPlay').href = g.url;
+    $('#rvBlurb').textContent = g.blurb || '';
+    showShot(g);
     var rv = $('#reveal');
     rv.classList.remove('anim'); void rv.offsetWidth; if (!reduceMotion) rv.classList.add('anim');
     var go = function () { markOpened(n); };
-    link.onclick = go; $('#rvPlay').onclick = go;
+    link.onclick = go; $('#rvPlay').onclick = go; $('#rvShot').onclick = go;
+    $('#revealSheet').scrollTop = 0;
     openOverlay($('#revealSheet'));
-    revealFor = n;
+    revealFor = n; revealFresh = !!fresh;
     if (fresh && !reduceMotion) {
       setTimeout(function () {
         var r = $('#revealSheet').getBoundingClientRect();
@@ -976,10 +1281,11 @@
       }, 420);
     }
   }
-  var revealFor = null;
   function closeReveal() {
-    var n = revealFor; revealFor = null;
+    var n = revealFor, fresh = revealFresh; revealFor = null; revealFresh = false;
     closeOverlays();
+    clearSel();
+    if (!fresh) return;
     var before = phase();
     render();
     if (n === TOTAL && before === 'complete') setTimeout(finale, 450);
@@ -987,7 +1293,17 @@
       var cur = currentDay();
       toast('Day ' + cur.n + ' is waiting too ✨', 2600);
       setTimeout(function () { focusToday(true); }, 300);
-    }
+    } else tipOnce(900);
+  }
+  // once: let her know the coloured spots can be tapped
+  function tipOnce(delay) {
+    var k = 'tip-tap' + (MODE === 'real' ? '' : ':' + MODE);
+    if (MODE === 'view' || pref(k)) return;
+    setTimeout(function () {
+      if (anyOverlay() || canColour() || !latestDone() || pref(k)) return;
+      pref(k, '1');
+      toast('Tap any coloured spot to see its game 🎮', 4200);
+    }, delay);
   }
   function markOpened(n) { state.opened[n] = 1; saveSoon(); updateShelfDot(); }
   function updateShelfDot() { var n = latestDone(); $('#shelfDot').classList.toggle('on', !!(n && !state.opened[n] && !record(n).pre)); }
@@ -1007,6 +1323,12 @@
         var a = document.createElement('a'); a.className = 'go'; a.href = d.game.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Play ↗';
         a.addEventListener('click', function () { markOpened(d.n); });
         meta.appendChild(b); meta.appendChild(s); li.appendChild(dot); li.appendChild(meta); li.appendChild(a);
+        li.className = 'tap';   // the rest of the row opens that day's game card
+        li.addEventListener('click', function (e) {
+          if (e.target.closest('a')) return;
+          closeOverlays();
+          setTimeout(function () { openDay(d.n); }, 240);
+        });
       } else {
         li.className = 'future';
         var isNow = ph === 'colour' && cur && cur.n === d.n;
@@ -1068,30 +1390,33 @@
 
   function intro() {
     if (reduceMotion || document.hidden) { card.classList.remove('intro'); return 0; }
-    var els = $$('path, circle', gInk);
-    var items = els.map(function (p) {
+    // the outlines draw themselves top to bottom, then the numbers are written in
+    var penNums = !!HAND;
+    var els = $$('path, circle', gInk).concat(penNums ? $$('path.num', gNum) : []);
+    var items = els.map(function (p, i) {
       var L = 0; try { L = p.getTotalLength(); } catch (e) { L = 0; }
       var bb; try { bb = p.getBBox(); } catch (e) { bb = { y: 0, height: 0 }; }
-      return { p: p, L: L, y: bb.y + bb.height / 2 };
+      return { p: p, L: L, y: bb.y + bb.height / 2, num: p.parentNode === gNum };
     });
     items.forEach(function (it) { if (it.L > 0) { it.p.style.strokeDasharray = it.L + ' ' + it.L; it.p.style.strokeDashoffset = it.L; } });
-    gFill.style.opacity = '0'; gStroke.style.opacity = '0'; gNum.style.opacity = '0';
+    gFill.style.opacity = '0'; gStroke.style.opacity = '0';
+    if (!penNums) gNum.style.opacity = '0';
     void svg.getBoundingClientRect();
     requestAnimationFrame(function () {
       items.forEach(function (it) {
         if (!(it.L > 0)) return;
-        var delay = 350 + it.y / H * 1100 + Math.random() * 180;
-        var dur = 520 + Math.min(700, it.L * 1.2);
-        it.p.style.transition = 'stroke-dashoffset ' + dur + 'ms cubic-bezier(.45,.05,.3,1) ' + delay + 'ms';
+        var delay = it.num ? 1500 + it.y / H * 900 + Math.random() * 200 : 350 + it.y / H * 1100 + Math.random() * 180;
+        var dur = it.num ? 380 + Math.min(420, it.L * 2.2) : 520 + Math.min(700, it.L * 1.2);
+        it.p.style.transition = 'stroke-dashoffset ' + dur + 'ms cubic-bezier(.45,.05,.3,1) ' + delay + 'ms, opacity .6s';
         it.p.style.strokeDashoffset = '0';
       });
       [gFill, gStroke].forEach(function (g) { g.style.transition = 'opacity 900ms ease 1500ms'; g.style.opacity = '1'; });
-      gNum.style.transition = 'opacity 700ms ease 1900ms'; gNum.style.opacity = '1';
+      if (!penNums) { gNum.style.transition = 'opacity 700ms ease 1900ms'; gNum.style.opacity = '1'; }
     });
     setTimeout(function () {
       items.forEach(function (it) { it.p.style.strokeDasharray = ''; it.p.style.strokeDashoffset = ''; it.p.style.transition = ''; });
       [gFill, gStroke, gNum].forEach(function (g) { g.style.transition = ''; g.style.opacity = ''; });
-    }, 3400);
+    }, 3600);
     return 2300;
   }
 
@@ -1106,6 +1431,8 @@
   var lastPhase = null;
   function render() {
     var ph = phase();
+    if (mix.open && !canColour()) closeMixer(true);
+    if (canColour()) hoverOff();
     renderBeads();
     paintAll();
     updateHighlights();
@@ -1124,7 +1451,7 @@
     burst(r.left + r.width * .25, r.top + r.height * .4, cols, 90, 1.1);
     setTimeout(function () { burst(r.left + r.width * .75, r.top + r.height * .35, cols, 90, 1.1); }, 350);
     setTimeout(function () { burst(r.left + r.width * .5, r.top + r.height * .55, cols, 120, 1.3); }, 700);
-    toast('You did it, ' + C.name + '! Happy first month 🎉', 4200);
+    toast('Congrats on your first month of work, baby! 🎉', 4200);
   }
 
   // live unlock at 6pm while the page is open
@@ -1157,7 +1484,7 @@
     clone.setAttribute('xmlns', NS);
     clone.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
     clone.setAttribute('width', W * scale); clone.setAttribute('height', H * scale);
-    ['.nums', '.hls', '.pings', '.fx'].forEach(function (s) { var e = clone.querySelector(s); if (e) e.remove(); });
+    ['.nums', '.hls', '.sels', '.pings', '.fx'].forEach(function (s) { var e = clone.querySelector(s); if (e) e.remove(); });
     var bg = document.createElementNS(NS, 'rect');
     bg.setAttribute('width', W); bg.setAttribute('height', H); bg.setAttribute('fill', '#fffdf7');
     clone.insertBefore(bg, clone.firstChild.nextSibling);
@@ -1201,7 +1528,22 @@
     if (MODE === 'view') {
       lab.textContent = '👀 View only · updates by itself';
     } else if (MODE === 'test') {
-      lab.textContent = '🧪 Test · not saved';
+      // pretend clock + "skip to 6pm", so the waiting screen and the 6pm unlock can be seen without waiting
+      b.title = 'Test page — nothing here is saved online';
+      var skip = btn('', skipToUnlock);
+      skip.title = 'Skip to the next unlock';
+      (function upd() {
+        var t = now();
+        lab.textContent = '🧪 ' + fmtDate(t) + ', ' + fmtTime(t);
+        var cur = currentDay(), wait = booted && cur && phase() === 'wait';
+        skip.hidden = !wait;
+        if (wait && skip.dataset.at !== String(cur.at)) {
+          skip.dataset.at = String(cur.at);
+          skip.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" aria-hidden="true" style="vertical-align:-1px;margin-right:4px"><path d="M2.5 5v14l9.5-7zM12 5v14l9.5-7z"/></svg>' + esc(fmtTime(cur.at));
+          skip.setAttribute('aria-label', 'Skip to ' + fmtTime(cur.at));
+        }
+        setTimeout(upd, 1000);
+      })();
       var sel = document.createElement('select'); sel.setAttribute('aria-label', 'Jump to a day');
       var o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'Jump to…'; sel.appendChild(o0);
       DAYS.forEach(function (d) {
@@ -1221,10 +1563,18 @@
   function resetSandbox() {
     frozen = true;
     try {
-      localStorage.removeItem(KEY); localStorage.removeItem(KEY + ':bak');
-      localStorage.removeItem('jfm-pref:welcomed:' + MODE);
+      localStorage.removeItem(KEY); localStorage.removeItem(KEY + ':bak'); localStorage.removeItem(KEY + ':clock');
+      localStorage.removeItem('jfm-pref:welcomed:' + MODE); localStorage.removeItem('jfm-pref:tip-tap:' + MODE);
     } catch (e) { /* ignore */ }
     location.reload();
+  }
+  // test page: wind the pretend clock to a few seconds before the next unlock
+  function skipToUnlock() {
+    var cur = currentDay();
+    if (!clock || !cur || phase() !== 'wait') return;
+    setClock(cur.at - 3200);
+    lastSecs = -1;
+    renderWait();
   }
   // Test page: colour everything before day v with sample colours, so any day can be tried straight away
   var SAMPLE = {
@@ -1250,6 +1600,9 @@
     });
     state = { v: 1, days: days, draft: null, opened: {} };
     save(false, true);
+    // and set the pretend clock to just after that day unlocks
+    var last = DAYS[DAYS.length - 1];
+    setClock(v === 'end' ? (last ? last.at : Date.now()) + 3600 * 1000 : DAY[+v].at + 1500);
     frozen = true;
     location.reload();
   }
@@ -1334,6 +1687,7 @@
       closeOverlays();
       var r = card.getBoundingClientRect();
       burst(r.left + r.width / 2, r.top + r.height * .25, ['#ffd65c', '#ff7f6e', '#a8e3cf', '#cdbcf5', '#b3ddf6'], 50, .8);
+      tipOnce(1400);
     });
   }
 
@@ -1346,12 +1700,18 @@
     svg.addEventListener('pointerup', function (e) { onUp(e, false); });
     svg.addEventListener('pointercancel', function (e) { onUp(e, true); });
     svg.addEventListener('lostpointercapture', function (e) { if (ptrs[e.pointerId]) onUp(e, false); });
+    svg.addEventListener('pointermove', onHover);
+    svg.addEventListener('pointerleave', hoverOff);
     svg.addEventListener('wheel', onWheel, { passive: false });
     svg.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     ['gesturestart', 'gesturechange'].forEach(function (t) { document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false }); });
 
     $$('#toolSeg button').forEach(function (b) { b.addEventListener('click', function () { setTool(b.dataset.tool); pref('tool', b.dataset.tool); }); });
     $$('#sizes button').forEach(function (b) { b.addEventListener('click', function () { setSize(+b.dataset.size); }); });
+    mixPointer($('#mxField'), 'field');
+    mixPointer($('#mxSat'), 'sat');
+    $('#mxOk').addEventListener('click', function () { closeMixer(true); });
+    $('#mxCancel').addEventListener('click', function () { closeMixer(false); });
     $('#undoBtn').addEventListener('click', undo);
     $('#doneBtn').addEventListener('click', askConfirm);
     $('#cfNo').addEventListener('click', closeOverlays);
@@ -1366,7 +1726,7 @@
     $('#zFit').addEventListener('click', function () { animateView(fullView(), 600); });
     $('#zFocus').addEventListener('click', function () { focusToday(true); });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') dismissTop();
+      if (e.key === 'Escape') { if (mix.open && !anyOverlay()) closeMixer(false); else dismissTop(); }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !anyOverlay()) { e.preventDefault(); undo(); }
     });
     // swipe the sheets down to close
@@ -1400,7 +1760,6 @@
 
   function init() {
     document.title = C.title;
-    $('#nm2').textContent = C.name;
     buildArt();
     buildPalette();
     setSize(clamp(sizeIdx, 0, 2) | 0);
@@ -1419,7 +1778,8 @@
       maybeWelcome(wait);
       if (phase() === 'colour' && MODE !== 'view') {
         setTimeout(function () { focusToday(true); }, Math.max(0, (wait ? wait - 200 : 0) - (Date.now() - tBoot)));
-      }
+      } else tipOnce((wait || 0) + 1200);
+      if (latestDone()) setTimeout(function () { preloadShot(latestDone()); }, 2500);
       if (SYNC_WRITE) pushPending();
     });
     setTimeout(function () { card.classList.remove('intro'); }, 1600);

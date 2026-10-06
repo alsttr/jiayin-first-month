@@ -2,14 +2,15 @@
 
 A digital version of the hand-drawn colour-by-number card. Every evening at **6pm Singapore time** a new
 number unlocks: its spots glow, she colours them in (paint-bucket **Fill** or **Brush**, always inside the
-lines), confirms with a "no take-backs" warning, and the **game of the day** is revealed.
+lines), confirms with a "no take-backs" warning, and the **game of the day** is revealed. Afterwards she can
+tap any coloured part of the picture to see that day's game again (with a screenshot of it).
 
 Works in any phone or computer browser — nothing to install.
 
 | Link | For | What it does |
 |------|-----|--------------|
 | https://alsttr.github.io/jiayin-first-month/ | **her** | The real thing. Every locked-in day is **saved online**, so her picture shows on any phone/browser. |
-| https://alsttr.github.io/jiayin-first-month/test/ | **you** | Test everything: all days unlocked now, "Jump to…" any day, **Reset**. Never saved online, never touches her picture. |
+| https://alsttr.github.io/jiayin-first-month/test/ | **you** | Test everything with a pretend clock: colour, lock in, see the locked screen she sees, **⏩ 6pm** to skip ahead, "Jump to…" any day, **Reset**. Never saved online, never touches her picture. |
 | https://alsttr.github.io/jiayin-first-month/view/ | **you** | Watch her picture (read-only, refreshes itself). Can't colour anything. |
 
 Don't colour on her link yourself — anything locked there is saved to *her* picture. Use the test link.
@@ -23,7 +24,7 @@ Unlocks at 6pm SGT on each date. Thursdays have the shorter games. 🇸🇬 = Si
 | # | Date | What she colours | Game of the day | Notes |
 |---|------|------------------|-----------------|-------|
 | 1 | Mon 5 Oct | sun | [Wordle](https://www.nytimes.com/games/wordle/index.html) | already coloured |
-| 2 | Tue 6 Oct | snow caps | [Squardle](https://fubargames.se/squardle/) |  |
+| 2 | Tue 6 Oct | snow caps | [Squaredle](https://squaredle.app/) | Boggle-style word search |
 | 3 | Wed 7 Oct | mountain | [Betweenle](https://betweenle.com/) |  |
 | 4 | Thu 8 Oct | right tree trunk | [Angle](https://angle.wtf/) | short (Thu) |
 | 5 | Fri 9 Oct | left tree trunk | [Connections](https://www.nytimes.com/games/connections) |  |
@@ -33,7 +34,7 @@ Unlocks at 6pm SGT on each date. Thursdays have the shorter games. 🇸🇬 = Si
 | 9 | Wed 14 Oct | 3 fruits | [Travle](https://travle.earth/) |  |
 | 10 | Thu 15 Oct | 3 fruits | [Worldle](https://worldle.teuteuf.fr/) | short (Thu) |
 | 11 | Fri 16 Oct | 1 fruit | [Geodle: MRT](https://geodle.vercel.app/sg-mrt-lrt) | 🇸🇬 MRT/LRT stations |
-| 12 | Mon 19 Oct | hill | [Squaredle](https://squaredle.app/) |  |
+| 12 | Mon 19 Oct | hill | [Wordiply](https://www.wordiply.com/) | longest word around a starter word |
 | 13 | Tue 20 Oct | small flowers' leaf + stems | [Metazooa](https://metazooa.com/) |  |
 | 14 | Wed 21 Oct | tulip | [Bandle](https://bandle.app/) |  |
 | 15 | Thu 22 Oct | big flower's left leaf | [Costcodle](https://costcodle.com/) | short (Thu) |
@@ -64,9 +65,13 @@ Every link was checked on 6 Oct 2026: all free, all with a daily puzzle, all pla
 Everything editable is in **`js/config.js`** (plain text, commented):
 
 * **Dates / unlock time** — `days[].date`, `unlockHour`.
-* **Games** — `days[].game` (`name`, `url`, `blurb`).
+* **Games** — `days[].game` (`name`, `url`, `blurb`, and `img`: the screenshot shown with it, in `assets/games/`).
+  To swap a game's picture, drop any phone screenshot of it in `assets/games/` (portrait, roughly 480×600 JPG is plenty)
+  and point `img` at it; delete the `img` line and the card shows little letter tiles instead.
 * **Which part is which number** — `regions`.
-* **Colour palette** — `palette`.
+* **Colour palette** — `palette`. (She can also mix any colour with the **+** bubble; her mixes are kept as extra swatches.)
+* **The numbers on the picture** are drawn in the handwriting from the real card (`js/hand.js`, traced by
+  `tools/pipeline/digits.py`). They follow `regions` automatically — change a number there and the picture shows it.
 
 Then publish the change (from this folder):
 
@@ -74,8 +79,8 @@ Then publish the change (from this folder):
 git add -A && git commit -m "Update schedule" && git push
 ```
 
-GitHub Pages updates the live site in about a minute. (Tip: bump the `?v=3` numbers at the bottom of
-`index.html` when you change CSS/JS so phones fetch the fresh files straight away.) Edits to games/dates never erase what she has already
+GitHub Pages updates the live site in about a minute. (Tip: bump the `?v=4` numbers in `index.html`
+when you change CSS/JS so phones fetch the fresh files straight away.) Edits to games/dates never erase what she has already
 coloured — that lives in the database (and on her phone).
 
 ---
@@ -101,8 +106,11 @@ https://supabase.com/dashboard/project/edvmiplelrueckisnumm — table `jfm_days`
 
 ## Testing without touching her picture
 
-* **https://alsttr.github.io/jiayin-first-month/test/** — everything unlocked, "Jump to…" a day
-  (earlier days get sample colours), **Reset** to start over. Nothing is saved online.
+* **https://alsttr.github.io/jiayin-first-month/test/** — runs on a pretend clock (shown in the purple bar).
+  It opens as the next spot unlocks, so you can colour straight away. After **Lock it in** you see exactly what
+  she sees: the waiting screen with the countdown, and the picture where every coloured part can be tapped to
+  show its game. **⏩ 6pm** jumps to a few seconds before the next unlock so you can watch it open live.
+  "Jump to…" goes to any day (earlier days get sample colours); **Reset** starts over. Nothing is saved online.
 * `?preview=` + any Singapore date/time pretends it's that moment (great for checking countdowns), e.g.
   https://alsttr.github.io/jiayin-first-month/?preview=2026-10-06T17:59 — watch Day 2 unlock live.
   Also sandboxed and never saved online.
@@ -121,6 +129,8 @@ time it opens the site, and she can colour it again.
 * Her picture is saved online, so it follows her to any phone, browser, chat-app browser or Home Screen icon.
 * If several days are missed, they queue up: she colours them in order and gets each day's game.
 * If the page is open at 6pm, the new spot unlocks live with a little celebration.
+* Any coloured part of the picture can be tapped (once that day is locked in) to bring back its game card:
+  screenshot, description and **Let's play**. The game shelf (🎮 button) lists them all too.
 * At the end she can **Save picture** (PNG of the finished drawing, numbers removed).
 
 ## Files
@@ -131,8 +141,10 @@ css/styles.css        look & feel
 js/config.js          ← everything you'd edit
 js/app.js             app logic (no dependencies, no build step)
 js/art.js             the digitised drawing (generated)
+js/hand.js            the numbers, in the card's handwriting (generated)
 assets/               icons + link-preview image
-tools/pipeline/       Python scripts used to trace the photo into vector art (photo not included)
+assets/games/         a screenshot of each game (shown on its game card)
+tools/pipeline/       Python scripts used to trace the photo into vector art + digits (photo not included)
 test/, view/          short links that open the test and view-only versions
 supabase/migrations/  database schema + rules (Supabase)
 tools/og.html         source for the link-preview image

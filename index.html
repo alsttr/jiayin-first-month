@@ -20,8 +20,8 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=3">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css?v=4">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i></div>
@@ -86,12 +86,21 @@
         <button class="round" id="undoBtn" aria-label="Undo" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
         <button class="btn sm" id="doneBtn" disabled>Done</button>
       </div>
+      <!-- the "+" bubble opens this: mix any colour -->
+      <div class="mixer" id="mixer" aria-hidden="true">
+        <div class="mx-field" id="mxField" role="slider" tabindex="0" aria-label="Colour: left and right for the colour, up and down for lighter or deeper"><i class="mx-knob" id="mxKnob"></i></div>
+        <div class="mx-row">
+          <button class="round" id="mxCancel" aria-label="Cancel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+          <div class="mx-sat-wrap"><span>soft</span><div class="mx-sat" id="mxSat" role="slider" tabindex="0" aria-label="Soft to bold" aria-valuemin="0" aria-valuemax="100"><i class="mx-knob" id="mxSatKnob"></i></div><span>bold</span></div>
+          <button class="btn sm mx-ok" id="mxOk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Use</button>
+        </div>
+      </div>
     </div>
 
     <!-- all 21 coloured -->
     <div class="pane done-pane" data-pane="complete">
-      <h2>Happy first month, <span id="nm2">Jiayin</span>! 🎉</h2>
-      <p>21 evenings, 21 spots, one very pretty picture.</p>
+      <h2>Congrats on your first month of work, baby! 🎉</h2>
+      <p>You made it, and now you’ve earned your WFH days.</p>
       <div class="row">
         <button class="btn butter sm" id="saveBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5"/><path d="M5 19.5h14"/></svg>Save picture</button>
         <button class="btn ghost sm" id="shelfBtn2">All 21 games</button>
@@ -127,10 +136,14 @@
 <div class="sheet" id="revealSheet" role="dialog" aria-modal="true" aria-labelledby="rvTitle">
   <div class="grab"></div>
   <div class="reveal" id="reveal">
+    <a class="shot" id="rvShot" href="#" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true" hidden>
+      <span class="bar"><i></i><i></i><i></i><b id="rvHost"></b></span>
+      <span class="pic"><img id="rvImg" alt="" decoding="async"></span>
+    </a>
     <div class="game-art" id="gameArt" aria-hidden="true"></div>
     <div class="tag">✨ Game of the day ✨</div>
     <div class="dayline" id="rvDay"></div>
-    <h2 id="rvTitle">We're playing <a id="rvLink" href="#" target="_blank" rel="noopener">Wordle</a> today!</h2>
+    <h2 id="rvTitle">We’re playing <a href="#" target="_blank" rel="noopener">Wordle</a> today!</h2>
     <p class="blurb" id="rvBlurb"></p>
     <a class="btn wide" id="rvPlay" href="#" target="_blank" rel="noopener">Let's play <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
     <button class="linkbtn" id="rvBack">Back to my picture</button>
@@ -151,8 +164,9 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <canvas id="fx" aria-hidden="true"></canvas>
 
-<script src="js/config.js?v=3"></script>
-<script src="js/art.js?v=3"></script>
-<script src="js/app.js?v=3"></script>
+<script src="js/config.js?v=4"></script>
+<script src="js/art.js?v=4"></script>
+<script src="js/hand.js?v=4"></script>
+<script src="js/app.js?v=4"></script>
 </body>
 </html>
