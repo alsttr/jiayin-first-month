@@ -5,3 +5,7 @@
 tools/pipeline/photo.jpg
 tools/pipeline/*.png
 __pycache__/
+.secrets/
+supabase/.temp/
+supabase/.branches/
+qa.html

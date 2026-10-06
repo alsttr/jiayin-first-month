@@ -19,6 +19,16 @@ window.CONFIG = {
   // Saved on her device under this key. Changing it starts everything from scratch.
   storageKey: 'jiayin-first-month-v1',
 
+  /* ONLINE SAVING — every locked-in day is saved here, so her picture shows on any phone or browser.
+     Supabase project "jiayin-first-month" (Singapore). The publishable key is meant to be public:
+     the database itself only allows reading, and adding each day ONCE (no edits, no deletes).
+     Set url to '' to switch online saving off (then it's saved on her device only). */
+  sync: {
+    url: 'https://edvmiplelrueckisnumm.supabase.co',
+    key: 'sb_publishable_DLUL_VqHLWgCOmo2ANGwJQ_r6yJXhMz',
+    table: 'jfm_days',
+  },
+
   /* ------------------------------------------------------------------------
      THE SCHEDULE — one entry per number in the drawing.
      date  : the day it unlocks (YYYY-MM-DD, unlocks at 6pm SGT that day)

@@ -4,9 +4,15 @@ A digital version of the hand-drawn colour-by-number card. Every evening at **6p
 number unlocks: its spots glow, she colours them in (paint-bucket **Fill** or **Brush**, always inside the
 lines), confirms with a "no take-backs" warning, and the **game of the day** is revealed.
 
-**Live site:** https://alsttr.github.io/jiayin-first-month/
-
 Works in any phone or computer browser — nothing to install.
+
+| Link | For | What it does |
+|------|-----|--------------|
+| https://alsttr.github.io/jiayin-first-month/ | **her** | The real thing. Every locked-in day is **saved online**, so her picture shows on any phone/browser. |
+| https://alsttr.github.io/jiayin-first-month/test/ | **you** | Test everything: all days unlocked now, "Jump to…" any day, **Reset**. Never saved online, never touches her picture. |
+| https://alsttr.github.io/jiayin-first-month/view/ | **you** | Watch her picture (read-only, refreshes itself). Can't colour anything. |
+
+Don't colour on her link yourself — anything locked there is saved to *her* picture. Use the test link.
 
 ---
 
@@ -68,38 +74,51 @@ Then publish the change (from this folder):
 git add -A && git commit -m "Update schedule" && git push
 ```
 
-GitHub Pages updates the live site in about a minute. (Tip: bump the `?v=2` numbers at the bottom of
-`index.html` when you change CSS/JS so phones fetch the fresh files straight away.) Her colouring is stored on her device, so edits to
-games/dates never erase what she has already coloured. (Only changing `storageKey` would start fresh.)
+GitHub Pages updates the live site in about a minute. (Tip: bump the `?v=3` numbers at the bottom of
+`index.html` when you change CSS/JS so phones fetch the fresh files straight away.) Edits to games/dates never erase what she has already
+coloured — that lives in the database (and on her phone).
 
 ---
 
+## Online saving (Supabase)
+
+Locked-in days are saved to a free Supabase database (project **jiayin-first-month**, Singapore):
+https://supabase.com/dashboard/project/edvmiplelrueckisnumm — table `jfm_days`, one row per day.
+
+* The database itself enforces the rules: anyone can read the picture, each day can be **added once**,
+  and nothing can be edited or deleted from the website (no take-backs). Colours must be hex codes.
+  Schema: `supabase/migrations/20261006000000_jfm_days.sql`.
+* Her phone keeps a local copy too, so the page opens instantly and works offline; anything locked
+  offline uploads by itself next time. Pages refresh from the database when opened, every minute,
+  and when she switches back to the tab.
+* In-progress colouring (before **Done → Lock it in**) stays on the device until locked.
+* The key in `js/config.js` is Supabase's *publishable* key — it's meant to be public.
+* Free Supabase projects pause after a week with no visits. During the month her daily visits keep it
+  awake; if it ever pauses, press **Restore** on the project in the dashboard (her phone's copy still works).
+* On this Mac only (git-ignored): `.secrets/supabase.env` (database password) and `.secrets/publishable.key`.
+  The Supabase CLI login token is in your macOS keychain; revoke it any time under
+  Supabase → Account → Access Tokens.
+
 ## Testing without touching her picture
 
-Add `?preview=` with any Singapore date/time to the link — it runs in a separate sandbox on your device:
+* **https://alsttr.github.io/jiayin-first-month/test/** — everything unlocked, "Jump to…" a day
+  (earlier days get sample colours), **Reset** to start over. Nothing is saved online.
+* `?preview=` + any Singapore date/time pretends it's that moment (great for checking countdowns), e.g.
+  https://alsttr.github.io/jiayin-first-month/?preview=2026-10-06T17:59 — watch Day 2 unlock live.
+  Also sandboxed and never saved online.
 
-* https://alsttr.github.io/jiayin-first-month/?preview=2026-10-06T18:01 — Day 2 just unlocked
-* https://alsttr.github.io/jiayin-first-month/?preview=2026-10-30T19:00 — everything unlocked (try the finale)
+## Behind-the-scenes panel & undo
 
-A dark "Preview" badge shows at the top with **Reset** (clears the sandbox) and **Exit**.
+https://alsttr.github.io/jiayin-first-month/?admin shows what's saved on that device and online,
+plus **Copy backup code** / **Restore from code**.
 
-## Behind-the-scenes panel
-
-Open the site with `?admin` (on **her** device, since that's where her picture lives):
-https://alsttr.github.io/jiayin-first-month/?admin
-
-* **Copy backup code** / **Restore from code** — move her picture to a new phone, or keep a backup.
-* **Undo last locked day** — if something goes wrong and she needs a redo.
-* **Erase everything on this device**.
+**Undo a locked day** (if something goes wrong and she needs a redo): Supabase dashboard → Table editor →
+`jfm_days` → tick the row whose `n` is that day → Delete. Every phone/browser drops that day the next
+time it opens the site, and she can colour it again.
 
 ## Good to know
 
-* Her progress lives in her browser on her device (no accounts, no servers). If she opens it on a
-  different phone/browser, that one starts from the beginning — use the backup code to move it.
-* **Open it in Safari/Chrome:** links tapped inside chat apps (Telegram, Instagram…) may open in that app's
-  built-in browser, which keeps its own separate copy. Best: open it in Safari/Chrome once and bookmark it.
-* **iPhone tip:** a site added to the Home Screen can open as its own little app with its *own* storage.
-  If she wants the Home Screen icon, add it **before** she starts colouring (or move her picture over with the backup code).
+* Her picture is saved online, so it follows her to any phone, browser, chat-app browser or Home Screen icon.
 * If several days are missed, they queue up: she colours them in order and gets each day's game.
 * If the page is open at 6pm, the new spot unlocks live with a little celebration.
 * At the end she can **Save picture** (PNG of the finished drawing, numbers removed).
@@ -114,6 +133,8 @@ js/app.js             app logic (no dependencies, no build step)
 js/art.js             the digitised drawing (generated)
 assets/               icons + link-preview image
 tools/pipeline/       Python scripts used to trace the photo into vector art (photo not included)
+test/, view/          short links that open the test and view-only versions
+supabase/migrations/  database schema + rules (Supabase)
 tools/og.html         source for the link-preview image
 .github/workflows/     safety net: re-requests a Pages build if the site is ever down (switches itself off once live)
 ```

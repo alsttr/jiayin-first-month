@@ -140,6 +140,7 @@ a { color: inherit; }
 .wait-pane { align-items: center; justify-content: center; text-align: center; gap: 4px; }
 .eyebrow { font-family: var(--font-round); font-weight: 500; font-size: 14px; color: var(--ink-soft); letter-spacing: .2px; }
 .countdown { display: flex; align-items: flex-end; gap: 6px; margin: 4px 0 2px; font-family: var(--font-round); }
+.countdown[hidden] { display: none; }
 .cd-unit { display: flex; flex-direction: column; align-items: center; }
 .cd-box { min-width: 56px; height: 52px; padding: 0 8px; border-radius: 16px; background: #fff; box-shadow: var(--shadow-sm), inset 0 -3px 0 rgba(59, 51, 48, .06);
   display: grid; place-items: center; font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; overflow: hidden; position: relative; }
@@ -293,6 +294,10 @@ a { color: inherit; }
 .pv { position: fixed; z-index: 45; top: calc(env(safe-area-inset-top) + 6px); left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: center;
   padding: 6px 8px 6px 12px; border-radius: 999px; background: #3b3330; color: #fff; font-size: 12px; font-weight: 700; box-shadow: var(--shadow); white-space: nowrap; }
 .pv button, .pv a { border: 0; border-radius: 999px; background: rgba(255, 255, 255, .16); color: #fff; padding: 4px 9px; font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: none; }
+.pv select { -webkit-appearance: none; appearance: none; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .16); color: #fff; padding: 4px 10px; font: 700 12px var(--font-body); cursor: pointer; }
+.pv select option { color: var(--ink); }
+.pv.test { background: #6a4bc4; }
+.pv.view { background: #2f6f86; }
 
 body.has-pv .app { padding-top: calc(env(safe-area-inset-top) + 30px); }
 

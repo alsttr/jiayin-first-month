@@ -30,11 +30,20 @@
      TIME (everything is Singapore time, UTC+8)
      ====================================================================== */
   var params = new URLSearchParams(location.search);
-  // Any ?preview=... link uses a separate test sandbox, even if the date can't be read (then it uses the real time).
-  var PREVIEW = params.has('preview') ? parsePreview(params.get('preview')) : null;
-  if (params.has('preview') && PREVIEW == null) PREVIEW = Date.now();
+  // Which version of the page this is:
+  //   real    — her picture: locked-in days are saved online (when CONFIG.sync is set)
+  //   test    — ?test  : everything unlocked, nothing saved online, separate sandbox on this device
+  //   preview — ?preview=YYYY-MM-DDTHH:MM : pretend it's that Singapore time, separate sandbox, nothing saved online
+  //   view    — ?view  : read-only look at her saved picture
+  var MODE = params.has('test') ? 'test' : params.has('preview') ? 'preview' : params.has('view') ? 'view' : 'real';
+  var PREVIEW = MODE === 'preview' ? parsePreview(params.get('preview')) : null;
+  if (MODE === 'preview' && PREVIEW == null) PREVIEW = Date.now();   // unreadable date: sandbox at the real time
+  var TEST_NOW = 0;   // set once the schedule is known (just after the last unlock)
   var t0 = Date.now();
-  function now() { return PREVIEW != null ? PREVIEW + (Date.now() - t0) : Date.now(); }
+  function now() {
+    if (MODE === 'test') return TEST_NOW + (Date.now() - t0);
+    return PREVIEW != null ? PREVIEW + (Date.now() - t0) : Date.now();
+  }
   function parsePreview(s) {
     if (!s) return null;
     if (s === 'now') return Date.now();
@@ -67,6 +76,7 @@
     .sort(function (a, b) { return a.n - b.n; });
   var DAY = {}; DAYS.forEach(function (d) { DAY[d.n] = d; });
   var TOTAL = DAYS.length;
+  TEST_NOW = (DAYS.length ? DAYS[DAYS.length - 1].at : Date.now()) + 3600 * 1000;
 
   var REG = {};
   A.regions.forEach(function (r) {
@@ -83,7 +93,7 @@
   /* ======================================================================
      STATE (saved on this device)
      ====================================================================== */
-  var KEY = C.storageKey + (PREVIEW != null ? ':preview' : '');
+  var KEY = C.storageKey + (MODE === 'real' ? '' : ':' + MODE);
   var state = load();
   function blank() { return { v: 1, days: {}, draft: null, opened: {} }; }
   function valid(s) { return s && s.v === 1 && s.days && typeof s.days === 'object'; }
@@ -102,13 +112,18 @@
     try { var raw = localStorage.getItem(KEY); if (raw) { var s = JSON.parse(raw); if (valid(s)) return s; } } catch (e) { /* ignore */ }
     return null;
   }
-  // Never lose a locked-in day: combine what's stored (maybe from another tab) with what's in memory.
+  // Never lose a locked-in day: combine what's stored (maybe written by another tab) with what's in memory.
+  // Days flagged srv are confirmed online; one missing from disk was removed online (by another tab's sync).
   function mergeWithDisk() {
     var disk = readDisk();
     if (!disk) return state;
     var out = { v: 1, days: {}, draft: state.draft, opened: {} };
     Object.keys(disk.days).forEach(function (k) { out.days[k] = disk.days[k]; });
-    Object.keys(state.days).forEach(function (k) { if (!out.days[k]) out.days[k] = state.days[k]; });
+    Object.keys(state.days).forEach(function (k) {
+      var m = state.days[k];
+      if (!out.days[k]) { if (!m.srv) out.days[k] = m; }
+      else if (m.srv && !out.days[k].srv) out.days[k] = m;
+    });
     [disk.opened, state.opened].forEach(function (o) { if (o) Object.keys(o).forEach(function (k) { out.opened[k] = 1; }); });
     if (out.draft && out.days[out.draft.day]) out.draft = null;
     return out;
@@ -133,6 +148,129 @@
     } catch (e) { return null; }
   }
 
+  /* ======================================================================
+     ONLINE SAVING (Supabase) — her locked-in days, shared by every browser
+     ====================================================================== */
+  var SYNC = (C.sync && C.sync.url && C.sync.key) ? C.sync : null;
+  var SYNC_READ = !!SYNC && (MODE === 'real' || MODE === 'view');
+  var SYNC_WRITE = !!SYNC && MODE === 'real';
+  var TABLE = (SYNC && SYNC.table) || 'jfm_days';
+  var syncBusy = false, pushing = false, lastSync = 0, lastSyncOk = 0, syncError = '', booted = false, remoteDirty = false;
+
+  function sbFetch(path, opts, ms) {
+    opts = opts || {};
+    var headers = { apikey: SYNC.key };
+    if (!/^sb_/.test(SYNC.key)) headers.Authorization = 'Bearer ' + SYNC.key;   // legacy JWT-style keys
+    var extra = opts.headers || {};
+    for (var h in extra) headers[h] = extra[h];
+    opts.headers = headers;
+    opts.cache = 'no-store';
+    var ctl = window.AbortController ? new AbortController() : null, timer = 0;
+    if (ctl) { opts.signal = ctl.signal; timer = setTimeout(function () { ctl.abort(); }, ms || 9000); }
+    return fetch(SYNC.url.replace(/\/+$/, '') + '/rest/v1/' + path, opts)
+      .then(function (r) { clearTimeout(timer); return r; }, function (e) { clearTimeout(timer); throw e; });
+  }
+  function parseStrokes(v) {
+    try { var a = typeof v === 'string' ? JSON.parse(v) : v; return Array.isArray(a) ? a : []; } catch (e) { return []; }
+  }
+  function fetchServerDays() {
+    return sbFetch(TABLE + '?select=n,fills,strokes,at&order=n.asc').then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (rows) {
+      var out = {};
+      (rows || []).forEach(function (row) {
+        out[row.n] = { fills: row.fills || {}, strokes: parseStrokes(row.strokes), at: +row.at || 0, srv: 1 };
+      });
+      return out;
+    });
+  }
+  function uploadDay(n, rec) {
+    var body = { n: +n, fills: rec.fills || {}, strokes: JSON.stringify(rec.strokes || []), at: rec.at || Date.now() };
+    return sbFetch(TABLE, { method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) }, 15000)
+      .then(function (r) {
+        if (r.ok) return 'ok';
+        if (r.status === 409) return 'exists';      // already locked from another device: the online copy wins
+        throw new Error('HTTP ' + r.status);
+      });
+  }
+  // The online copy is the source of truth. Keep local days that haven't been uploaded yet.
+  function applyServer(server) {
+    var disk = readDisk(), pool = {};
+    [disk && disk.days, state.days].forEach(function (src) {
+      if (src) Object.keys(src).forEach(function (k) { if (!pool[k] || (src[k] && !src[k].srv)) pool[k] = src[k]; });
+    });
+    var days = {};
+    Object.keys(server).forEach(function (k) { days[k] = server[k]; });
+    Object.keys(pool).forEach(function (k) { if (!days[k] && pool[k] && !pool[k].srv) days[k] = pool[k]; });
+    var before = dayDigest(state.days);
+    var draft = state.draft && !days[state.draft.day] ? state.draft : null;
+    var opened = {};
+    [disk && disk.opened, state.opened].forEach(function (o) { if (o) Object.keys(o).forEach(function (k) { opened[k] = 1; }); });
+    var changed = before !== dayDigest(days) || (!!state.draft && !draft);
+    state = { v: 1, days: days, draft: draft, opened: opened };
+    save(false, true);
+    return changed;
+  }
+  function dayDigest(days) {
+    return Object.keys(days).sort(function (a, b) { return a - b; }).map(function (k) {
+      var d = days[k];
+      return k + ':' + JSON.stringify(Object.keys(d.fills || {}).sort().map(function (id) { return [id, String(d.fills[id]).toLowerCase()]; })) + ':' + JSON.stringify(d.strokes || []);
+    }).join('|');
+  }
+  function syncNow() {
+    if (!SYNC_READ || syncBusy) return Promise.resolve(false);
+    syncBusy = true; lastSync = Date.now();
+    return fetchServerDays().then(function (server) {
+      syncBusy = false; lastSyncOk = Date.now(); syncError = '';
+      var changed = applyServer(server);
+      if (SYNC_WRITE) pushPending();
+      if (changed && booted) { remoteDirty = true; flushRemote(); }
+      return changed;
+    }, function (e) {
+      syncBusy = false; syncError = String(e && e.message || e);
+      return false;
+    });
+  }
+  function pushPending() {
+    if (!SYNC_WRITE || pushing) return;
+    var pend = Object.keys(state.days).filter(function (k) { return !state.days[k].srv; }).sort(function (a, b) { return a - b; });
+    if (!pend.length) return;
+    pushing = true;
+    (function next(i) {
+      if (i >= pend.length) { pushing = false; return; }
+      var k = pend[i], rec = state.days[k];
+      if (!rec || rec.srv) { next(i + 1); return; }
+      uploadDay(k, rec).then(function (res) {
+        if (res === 'ok') {
+          if (state.days[k]) state.days[k].srv = 1;
+          save(false);
+          next(i + 1);
+        } else { pushing = false; syncNow(); }
+      }, function (e) { pushing = false; syncError = String(e && e.message || e); });   // offline: retried on the next sync
+    })(0);
+  }
+  // re-draw after the online copy changed — but never in the middle of a brush stroke or an open sheet
+  function flushRemote() {
+    if (!remoteDirty || live || anyOverlay()) return;
+    remoteDirty = false;
+    var was = lastPhase, cur0 = currentDay();
+    lastPhase = null;
+    render();
+    var cur1 = currentDay();
+    if (phase() === 'colour' && (!cur0 || !cur1 || cur0.n !== cur1.n)) focusToday(true);
+    else if (was === 'colour' && phase() !== 'colour') animateView(fullView(), 700);
+  }
+  function firstSync(maxMs) {
+    if (!SYNC_READ) return Promise.resolve();
+    return new Promise(function (resolve) {
+      var done = false;
+      function fin() { if (!done) { done = true; resolve(); } }
+      setTimeout(fin, maxMs);
+      syncNow().then(fin, fin);
+    });
+  }
+
   function record(n) {
     if (state.days[n]) return state.days[n];
     var pf = C.prefilled && C.prefilled[n];
@@ -141,6 +279,7 @@
   function isDone(n) { return !!record(n); }
   function currentDay() { for (var i = 0; i < DAYS.length; i++) if (!isDone(DAYS[i].n)) return DAYS[i]; return null; }
   function phase() { var d = currentDay(); if (!d) return 'complete'; return now() >= d.at ? 'colour' : 'wait'; }
+  function canColour() { return MODE !== 'view' && phase() === 'colour'; }
   function draftFor(n) {
     if (!state.draft || state.draft.day !== n) state.draft = { day: n, fills: {}, strokes: [], ops: [] };
     if (!state.draft.ops) state.draft.ops = [];
@@ -347,7 +486,7 @@
   }
   function updateHighlights() {
     gHl.textContent = ''; gPing.textContent = '';
-    if (phase() !== 'colour') return;
+    if (phase() !== 'colour' || MODE === 'view') return;
     var cur = currentDay(), d = draftFor(cur.n);
     todayIds().forEach(function (id) {
       var r = REG[id];
@@ -408,7 +547,7 @@
     $$('#toolSeg button').forEach(function (b) { var on = b.dataset.tool === t; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
     var on = $('#toolSeg button.on'), pill = $('#toolPill');
     if (on) { pill.style.width = on.offsetWidth + 'px'; pill.style.transform = 'translateX(' + (on.offsetLeft - 4) + 'px)'; }
-    $('#sizes').classList.toggle('off', t !== 'brush' || phase() !== 'colour');
+    $('#sizes').classList.toggle('off', t !== 'brush' || !canColour());
     updatePrompt();
   }
   function setSize(i) {
@@ -440,7 +579,7 @@
     d.ops.push({ t: 'f', id: id, prev: prev });
     animateFill(id, colour, x, y);
     sparkle(x, y, colour);
-    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) { /* ignore */ } }
+    if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) { try { navigator.vibrate(12); } catch (e) { /* ignore */ } }
     afterEdit();
   }
   function animateFill(id, c, x, y) {
@@ -564,7 +703,7 @@
     ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
     stopViewAnim();
     if (nPtrs === 1) {
-      if (phase() === 'colour' && tool === 'brush') {
+      if (canColour() && tool === 'brush') {
         var a = toArt(e.clientX, e.clientY);
         startStroke(a);
         gest = { type: 'paint', id: e.pointerId };
@@ -627,7 +766,7 @@
   function onTap(cx, cy) {
     var a = toArt(cx, cy);
     if (a.x < 0 || a.y < 0 || a.x > W || a.y > H) return;
-    if (phase() === 'colour') {
+    if (canColour()) {
       var id = pickToday(a.x, a.y);
       if (id) { doFill(id, a.x, a.y); return; }
       var other = regionsAt(a.x, a.y)[0];
@@ -696,7 +835,10 @@
   function latestDone() { var n = null; DAYS.forEach(function (d) { if (isDone(d.n)) n = d.n; }); return n; }
   function renderWait() {
     var cur = currentDay(); if (!cur) return;
-    $('#waitWhen').textContent = relDay(cur.at) + ' · ' + fmtTime(cur.at);
+    var ready = now() >= cur.at;   // only happens in view mode: the day is open but she hasn't coloured it yet
+    $('#waitLabel').textContent = ready ? 'Day ' + cur.n + ' is ready for ' + C.name + ' ✨' : 'Next spot unlocks in';
+    $('#countdown').hidden = ready;
+    $('#waitWhen').textContent = (ready ? 'Unlocked ' : '') + relDay(cur.at) + ' · ' + fmtTime(cur.at);
     var n = latestDone(), chip = $('#gameChip');
     if (n && DAY[n]) {
       chip.hidden = false;
@@ -765,11 +907,12 @@
     var cur = currentDay(); if (!cur || phase() !== 'colour') { closeOverlays(); return; }
     var n = cur.n, d = draftFor(n);
     var rec = { fills: d.fills, strokes: d.strokes, at: Date.now() };
-    if (PREVIEW != null) rec.sim = now();
+    if (MODE !== 'real') rec.sim = now();
     state.days[n] = rec;
     state.draft = null;
     var ok = save(true);
     lastPhase = phase();   // the reveal sheet takes over; render() runs when it closes
+    pushPending();         // save it to the website (retried later if offline)
     if (navigator.storage && navigator.storage.persist) { try { navigator.storage.persist(); } catch (e) { /* ignore */ } }
     closeOverlays();
     gHl.textContent = ''; gPing.textContent = '';
@@ -967,11 +1110,11 @@
     paintAll();
     updateHighlights();
     updateShelfDot();
-    $('#zFocus').hidden = ph !== 'colour' || todayIds().length === 0;
-    $('#sizes').classList.toggle('off', tool !== 'brush' || ph !== 'colour');
-    if (ph === 'wait') { showPane('wait'); renderWait(); }
-    else if (ph === 'colour') { showPane('colour'); setTool(tool); updateDone(); updatePrompt(); }
-    else { showPane('complete'); }
+    $('#zFocus').hidden = !canColour() || todayIds().length === 0;
+    $('#sizes').classList.toggle('off', tool !== 'brush' || !canColour());
+    if (ph === 'complete') showPane('complete');
+    else if (ph === 'wait' || MODE === 'view') { showPane('wait'); renderWait(); }
+    else { showPane('colour'); setTool(tool); updateDone(); updatePrompt(); }
     lastPhase = ph;
   }
 
@@ -986,12 +1129,14 @@
 
   // live unlock at 6pm while the page is open
   function heartbeat() {
+    if (!booted) return;
+    if (remoteDirty) flushRemote();
     var ph = phase();
     if (ph !== lastPhase) {
       var was = lastPhase;
       if (!anyOverlay() && !live) {
         render();
-        if (was === 'wait' && ph === 'colour') {
+        if (was === 'wait' && ph === 'colour' && MODE !== 'view') {
           var cur = currentDay();
           toast('Day ' + cur.n + ' is here! ✨', 3000);
           var r = card.getBoundingClientRect();
@@ -1046,17 +1191,67 @@
   /* ======================================================================
      PREVIEW BADGE + ADMIN (for the person who made this)
      ====================================================================== */
+  // A small badge on every page that isn't her real one (test / preview / view)
   function previewBadge() {
-    if (PREVIEW == null) return;
+    if (MODE === 'real') return;
     document.body.classList.add('has-pv');
-    var b = document.createElement('div'); b.className = 'pv';
+    var b = document.createElement('div'); b.className = 'pv ' + MODE;
     var lab = document.createElement('span'); b.appendChild(lab);
-    var reset = document.createElement('button'); reset.textContent = 'Reset';
-    reset.onclick = function () { frozen = true; try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + ':bak'); } catch (e) { /* ignore */ } location.reload(); };
-    var exit = document.createElement('a'); exit.textContent = 'Exit'; exit.href = location.pathname;
-    b.appendChild(reset); b.appendChild(exit);
+    function btn(text, fn) { var e = document.createElement('button'); e.textContent = text; e.onclick = fn; b.appendChild(e); return e; }
+    if (MODE === 'view') {
+      lab.textContent = '👀 View only · updates by itself';
+    } else if (MODE === 'test') {
+      lab.textContent = '🧪 Test · not saved';
+      var sel = document.createElement('select'); sel.setAttribute('aria-label', 'Jump to a day');
+      var o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'Jump to…'; sel.appendChild(o0);
+      DAYS.forEach(function (d) {
+        if (C.prefilled && C.prefilled[d.n]) return;
+        var o = document.createElement('option'); o.value = String(d.n); o.textContent = 'Day ' + d.n; sel.appendChild(o);
+      });
+      var oe = document.createElement('option'); oe.value = 'end'; oe.textContent = 'All done'; sel.appendChild(oe);
+      sel.onchange = function () { if (sel.value) testJump(sel.value); };
+      b.appendChild(sel);
+      btn('Reset', resetSandbox);
+    } else {
+      btn('Reset', resetSandbox);
+      (function upd() { lab.textContent = 'Preview · ' + fmtDate(now()) + ', ' + fmtTime(now()); setTimeout(upd, 1000); })();
+    }
     document.body.appendChild(b);
-    (function upd() { lab.textContent = 'Preview · ' + fmtDate(now()) + ', ' + fmtTime(now()); setTimeout(upd, 1000); })();
+  }
+  function resetSandbox() {
+    frozen = true;
+    try {
+      localStorage.removeItem(KEY); localStorage.removeItem(KEY + ':bak');
+      localStorage.removeItem('jfm-pref:welcomed:' + MODE);
+    } catch (e) { /* ignore */ }
+    location.reload();
+  }
+  // Test page: colour everything before day v with sample colours, so any day can be tried straight away
+  var SAMPLE = {
+    snow_left: '#FFFFFF', snow_right: '#FFFFFF', mountain: '#B49CF0', trunk_left: '#9C6B43', trunk_right: '#9C6B43',
+    canopy_left: '#7CCB72', canopy_right: '#3E9E54', canopy_right_nook: '#3E9E54', canopy_right_strip: '#3E9E54',
+    fruit_L1: '#F25C54', fruit_L2: '#FFB347', fruit_L3: '#F25C54', fruit_L4: '#F25C54',
+    fruit_R1: '#FFB347', fruit_R2: '#F25C54', fruit_R3: '#F25C54', fruit_R4: '#FFB347',
+    hill: '#B8EBC0', flower_leaf: '#3E9E54', flower_big_stem: '#3E9E54', flower_small_stem: '#3E9E54',
+    tulip_head: '#FF8FAB', daisy_leaf_left: '#7CCB72', daisy_leaf_right: '#7CCB72', daisy_stem: '#3E9E54',
+    flower_big_centre: '#FFE45C', flower_big_petals: '#FF8FAB', flower_small_petals: '#B49CF0', flower_small_centre: '#FFE45C',
+    ground: '#C4D97A', ground_between_flowers: '#C4D97A', tulip_leaf_left: '#3E9E54', tulip_leaf_right: '#3E9E54',
+    tulip_stem: '#3E9E54', daisy_centre: '#FFE45C', daisy_petals: '#E9B8F2', sky: '#A9DDF7', sky_between_trees: '#A9DDF7'
+  };
+  function testJump(v) {
+    var days = {};
+    DAYS.forEach(function (d) {
+      if (C.prefilled && C.prefilled[d.n]) return;
+      if (v === 'end' || d.n < +v) {
+        var fills = {};
+        (DAY_REGIONS[d.n] || []).forEach(function (id) { fills[id] = SAMPLE[id] || C.palette[id.length % C.palette.length]; });
+        days[d.n] = { fills: fills, strokes: [], at: Date.now(), sim: 1 };
+      }
+    });
+    state = { v: 1, days: days, draft: null, opened: {} };
+    save(false, true);
+    frozen = true;
+    location.reload();
   }
   function cleanUrl() {
     var q = new URLSearchParams(location.search); q.delete('admin');
@@ -1071,8 +1266,15 @@
     function btn(t, fn, cls) { var e = document.createElement('button'); e.className = 'btn sm ' + (cls || 'ghost'); e.textContent = t; e.onclick = fn; box.appendChild(e); return e; }
     var h = document.createElement('h3'); h.textContent = 'Behind the scenes'; box.appendChild(h);
     var locked = Object.keys(state.days).map(Number).sort(function (a, b) { return a - b; });
-    p('Storage: ' + KEY + (PREVIEW != null ? ' (preview sandbox)' : ' (real)'));
-    p('Locked on this device: ' + (locked.length ? locked.join(', ') : 'none yet') + '  ·  phase: ' + phase());
+    p('Page: ' + MODE + (MODE === 'real' ? ' (her picture)' : ' (sandbox — never saved online)'));
+    p('On this device: ' + (locked.length ? 'days ' + locked.join(', ') : 'nothing locked yet') + '  ·  now: ' + phase());
+    var online = p(SYNC ? 'Saved online: checking…' : 'Online saving is off (no Supabase settings in config.js).');
+    if (SYNC) {
+      fetchServerDays().then(function (srv) {
+        var ks = Object.keys(srv).map(Number).sort(function (a, b) { return a - b; });
+        online.textContent = 'Saved online: ' + (ks.length ? 'days ' + ks.join(', ') : 'nothing yet') + (SYNC_WRITE ? '' : '  (this page only reads)');
+      }, function (e) { online.textContent = 'Saved online: couldn’t reach the database (' + (e && e.message || e) + ')'; });
+    }
     var ta = document.createElement('textarea'); ta.placeholder = 'Backup code appears / paste one here'; box.appendChild(ta);
     btn('Copy backup code', function () {
       state = mergeWithDisk();
@@ -1084,35 +1286,43 @@
       try {
         var s = JSON.parse(decodeURIComponent(escape(atob(ta.value.trim()))));
         if (!valid(s)) throw new Error('bad');
-        if (!confirm('Replace the picture on this device with the backup?')) return;
+        if (!confirm('Load this backup on this device? (Days already saved online keep their online colours.)')) return;
+        Object.keys(s.days).forEach(function (k) { if (s.days[k]) delete s.days[k].srv; });   // re-upload anything missing online
         state = { v: 1, days: s.days, draft: null, opened: s.opened || {} }; save(true, true); frozen = true; location.href = cleanUrl();
       } catch (e) { alert('That code doesn’t look right.'); }
     });
-    btn('Undo last locked day', function () {
-      var l = Object.keys(state.days).map(Number).sort(function (a, b) { return b - a; })[0];
-      if (!l) { alert('Nothing locked yet.'); return; }
-      if (!confirm('Unlock Day ' + l + ' so it can be coloured again?')) return;
-      delete state.days[l]; state.draft = null; save(true, true); frozen = true; location.href = cleanUrl();
-    });
-    btn('Erase everything on this device', function () {
-      if (!confirm('Erase all colouring on this device? This cannot be undone.')) return;
+    if (SYNC) {
+      var ref = (SYNC.url.match(/^https?:\/\/([^.]+)\./) || [])[1];
+      btn('Undo a locked day (opens Supabase)', function () {
+        alert('Locked days are protected online, so undo them in Supabase:\nTable editor → ' + TABLE + ' → tick the day’s row (column n) → Delete.\nEvery phone/browser drops that day the next time it opens the site.');
+        if (ref) window.open('https://supabase.com/dashboard/project/' + ref + '/editor', '_blank', 'noopener');
+      });
+    } else {
+      btn('Undo last locked day', function () {
+        var l = Object.keys(state.days).map(Number).sort(function (a, b) { return b - a; })[0];
+        if (!l) { alert('Nothing locked yet.'); return; }
+        if (!confirm('Unlock Day ' + l + ' so it can be coloured again?')) return;
+        delete state.days[l]; state.draft = null; save(true, true); frozen = true; location.href = cleanUrl();
+      });
+    }
+    btn(SYNC ? 'Clear this device’s copy' : 'Erase everything on this device', function () {
+      if (!confirm(SYNC ? 'Clear this device’s copy? Days saved online come back when the page reloads.' : 'Erase all colouring on this device? This cannot be undone.')) return;
       frozen = true;
       try { localStorage.removeItem(KEY); localStorage.removeItem(KEY + ':bak'); } catch (e) { /* ignore */ }
       location.href = cleanUrl();
     });
     btn('Close', function () { wrap.remove(); }, '');
-    p('Test without touching her picture: add ?preview=2026-10-14T19:00 to the link (any date/time, Singapore time).');
+    p('Try things without touching her picture: open the /test/ page (everything unlocked, nothing saved online).');
     document.body.appendChild(wrap);
   }
-
   function dismissTop() {
     if ($('#welcome').classList.contains('on')) $('#wGo').click();
     else if ($('#revealSheet').classList.contains('on')) closeReveal();
     else closeOverlays();
   }
   function maybeWelcome(wait) {
-    if (params.has('admin')) return;
-    var k = 'welcomed' + (PREVIEW != null ? ':preview' : '');
+    if (params.has('admin') || MODE === 'view') return;
+    var k = 'welcomed' + (MODE === 'real' ? '' : ':' + MODE);
     if (pref(k)) return;
     $('#wTitle').textContent = 'Hi ' + C.name + '! 🌷';
     setTimeout(function () {
@@ -1171,9 +1381,15 @@
     });
     if (window.ResizeObserver) new ResizeObserver(layout).observe(stage); else window.addEventListener('resize', layout);
     window.addEventListener('resize', sizeFx);
-    document.addEventListener('visibilitychange', function () { if (document.hidden) save(false); else heartbeat(); });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { save(false); return; }
+      heartbeat();
+      if (Date.now() - lastSync > 15000) syncNow();
+    });
+    window.addEventListener('online', function () { syncNow(); });
+    if (SYNC_READ) setInterval(function () { if (!document.hidden) syncNow(); }, MODE === 'view' ? 20000 : 60000);
     window.addEventListener('storage', function (e) {
-      if (e.key !== KEY || live || anyOverlay()) return;
+      if (!booted || e.key !== KEY || live || anyOverlay()) return;
       var before = JSON.stringify(state.days);
       state = mergeWithDisk();
       if (JSON.stringify(state.days) !== before) { lastPhase = null; render(); }
@@ -1191,13 +1407,21 @@
     tool = pref('tool') === 'brush' ? 'brush' : 'fill';
     wire();
     layout();
-    render();
-    setTool(tool);
+    var tBoot = Date.now();
     var wait = intro();
     previewBadge();
     adminPanel();
-    maybeWelcome(wait);
-    if (phase() === 'colour') setTimeout(function () { focusToday(true); }, wait ? wait - 200 : 0);
+    // show her saved picture from the website first (up to 1.5s), then draw the page state
+    firstSync(1500).then(function () {
+      booted = true;
+      render();
+      setTool(tool);
+      maybeWelcome(wait);
+      if (phase() === 'colour' && MODE !== 'view') {
+        setTimeout(function () { focusToday(true); }, Math.max(0, (wait ? wait - 200 : 0) - (Date.now() - tBoot)));
+      }
+      if (SYNC_WRITE) pushPending();
+    });
     setTimeout(function () { card.classList.remove('intro'); }, 1600);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { setTool(tool); });
   }
