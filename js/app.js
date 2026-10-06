@@ -1053,7 +1053,7 @@
     var d = DAY[r.n];
     if (!d) return;
     if (isDone(r.n)) {
-      toast('Day ' + r.n + ' · ' + esc(fmtDate(d.at)) + ' · <a href="' + esc(d.game.url) + '" target="_blank" rel="noopener">' + esc(d.game.name) + ' ↗</a>', 3600, true);
+      toast('Day ' + r.n + ' · ' + fmtDate(d.at) + ' · ' + d.game.name + ' 🎮', 3200);
     } else if (d.at <= now()) {
       toast('Spot ' + r.n + ' is up next ✨', 2600);
     } else {
@@ -1101,12 +1101,13 @@
     $('#countdown').hidden = ready;
     $('#waitWhen').textContent = (ready ? 'Unlocked ' : '') + relDay(cur.at) + ' · ' + fmtTime(cur.at);
     var n = latestDone(), chip = $('#gameChip');
-    if (n && DAY[n]) {
+    if (n && DAY[n]) {   // opens that day's game card (only the card links to the game)
+      var lbl = dayKey(DAY[n].at) === dayKey(now()) ? 'Today’s game:' : 'Latest game:';
       chip.hidden = false;
-      chip.href = DAY[n].game.url;
-      $('#chipLbl').textContent = (dayKey(DAY[n].at) === dayKey(now()) ? 'Today’s game:' : 'Latest game:');
-      $('#chipName').textContent = DAY[n].game.name + ' ↗';
-      chip.onclick = function () { markOpened(n); };
+      chip.dataset.n = String(n);
+      $('#chipLbl').textContent = lbl;
+      $('#chipName').textContent = DAY[n].game.name;
+      chip.setAttribute('aria-label', lbl + ' ' + DAY[n].game.name);
     } else chip.hidden = true;
     tickCountdown(true);
   }
@@ -1136,7 +1137,95 @@
   }
   function closeOverlays() {
     $$('.modal.on, .sheet.on').forEach(function (m) { m.classList.remove('on'); });
+    $$('.sheet.under').forEach(function (m) { m.classList.remove('under'); });
     $('#scrim').classList.remove('on');
+  }
+  function closeSheet(el) {   // close just this sheet (a sheet underneath it stays open)
+    el.classList.remove('on');
+    if (!anyOverlay()) $('#scrim').classList.remove('on');
+  }
+
+  /* ---- a button grows into its card, and the card shrinks back into it when closed ---- */
+  var morphBusy = false;
+  function morphable(el) {
+    if (reduceMotion || !el || !el.isConnected || el.hidden || !el.animate) return false;
+    if (el.closest('.pane:not(.on), .sheet:not(.on)')) return false;
+    var r = el.getBoundingClientRect();
+    return r.width > 4 && r.height > 4 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
+  }
+  function rectCss(r) { return { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' }; }
+  function radii(el, r) {   // the four corner radii, no rounder than the box allows
+    var cs = getComputedStyle(el), max = Math.min(r.width, r.height) / 2, o = {};
+    ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].forEach(function (k) { o['border' + k + 'Radius'] = Math.min(parseFloat(cs['border' + k + 'Radius']) || 0, max) + 'px'; });
+    return o;
+  }
+  var FACE_CSS = ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing', 'lineHeight', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+    'columnGap', 'rowGap', 'justifyContent', 'alignItems', 'color', 'backgroundColor', 'boxShadow',
+    'borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'];
+  function ghostOf(el, r) {   // a stand-in for the button that can stretch into a card
+    var g = document.createElement('div');
+    g.className = 'morph' + (el.closest('.shelf') ? ' shelf' : '');   // shelf rows get their look from the shelf
+    var face = el.cloneNode(true), cs = getComputedStyle(el);
+    face.removeAttribute('id'); face.removeAttribute('hidden'); face.classList.remove('ready');
+    $$('[id]', face).forEach(function (x) { x.removeAttribute('id'); });
+    face.classList.add('m-face');
+    FACE_CSS.forEach(function (k) { face.style[k] = cs[k]; });   // looks exactly like the button, wherever it lives
+    face.style.whiteSpace = 'nowrap';
+    var bg = document.createElement('div'); bg.className = 'm-bg';
+    g.appendChild(face); g.appendChild(bg);
+    var c = rectCss(r); for (var k in c) g.style[k] = c[k];
+    document.body.appendChild(g);
+    return { g: g, face: face, bg: bg };
+  }
+  function whenDone(anim, ms, fn) {   // fn runs once: when the animation ends, or after ms at the latest
+    var ran = false;
+    function go() { if (!ran) { ran = true; fn(); } }
+    if (anim) anim.onfinish = go;
+    setTimeout(go, ms);
+  }
+  function growInto(sheet, from, done) {
+    morphBusy = true;
+    var fr = from.getBoundingClientRect(), r0 = radii(from, fr);
+    sheet.style.transition = 'none'; sheet.style.visibility = 'hidden'; sheet.scrollTop = 0;
+    openOverlay(sheet);   // in place (but unseen) so we know where the card ends up
+    var sr = sheet.getBoundingClientRect(), r1 = radii(sheet, sr);
+    var m = ghostOf(from, fr);
+    from.style.visibility = 'hidden';
+    var D = 540, ease = 'cubic-bezier(.3,0,.1,1)';   // eases out of the button, then glides into place
+    var a = m.g.animate([rectCss(fr), rectCss(sr)], { duration: D, easing: ease, fill: 'forwards' });
+    m.bg.animate([r0, r1], { duration: D, easing: ease, fill: 'forwards' });
+    m.bg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: D * 0.42, easing: 'ease-out', fill: 'both' });
+    m.face.animate([{ opacity: 1 }, { opacity: 0 }], { duration: D * 0.42, easing: 'ease-in', fill: 'forwards' });
+    whenDone(a, D + 150, function () {
+      from.style.visibility = '';
+      sheet.style.visibility = '';
+      void sheet.offsetWidth;
+      sheet.style.transition = '';
+      morphBusy = false;
+      if (done) done();
+      var f = m.g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
+      whenDone(f, 400, function () { m.g.remove(); });
+    });
+  }
+  function shrinkInto(sheet, to, keepBackdrop, done) {
+    morphBusy = true;
+    var sr = sheet.getBoundingClientRect(), r1 = radii(sheet, sr);
+    var m = ghostOf(to, sr);
+    m.face.style.opacity = '0';
+    for (var k in r1) m.bg.style[k] = r1[k];
+    var a0 = m.g.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 130, easing: 'ease-out', fill: 'forwards' });
+    whenDone(a0, 220, function () {
+      sheet.style.transition = 'none'; sheet.classList.remove('on'); void sheet.offsetWidth; sheet.style.transition = '';
+      if (!keepBackdrop && !anyOverlay()) $('#scrim').classList.remove('on');
+      var tr = to.getBoundingClientRect(), r0 = radii(to, tr);
+      to.style.visibility = 'hidden';
+      var D = 440, ease = 'cubic-bezier(.45,0,.2,1)';
+      var a = m.g.animate([rectCss(sr), rectCss(tr)], { duration: D, easing: ease, fill: 'forwards' });
+      m.bg.animate([r1, r0], { duration: D, easing: ease, fill: 'forwards' });
+      m.bg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: D * 0.4, delay: D * 0.6, easing: 'ease-in', fill: 'forwards' });
+      m.face.animate([{ opacity: 0 }, { opacity: 1 }], { duration: D * 0.45, delay: D * 0.55, easing: 'ease-out', fill: 'both' });
+      whenDone(a, D + 150, function () { to.style.visibility = ''; m.g.remove(); morphBusy = false; if (done) done(); });
+    });
   }
 
   var toastTimer = 0;
@@ -1212,7 +1301,14 @@
 
   // ---- the game card: revealed when a day is locked in, and again whenever she taps that day ----
   var TILE_COLS = ['#6aaa64', '#e2b93b', '#ff7f6e'];
-  var revealFor = null, revealFresh = false;
+  var revealFor = null, revealFresh = false, revealFrom = null, revealUnder = null;
+  var shownAt = 0;   // when a card last appeared: a tap in the first moment is ignored (no surprise game launches)
+  function guardLinks(fn) {
+    return function (e) {
+      if (performance.now() - shownAt < 450) { e.preventDefault(); return; }
+      if (fn) fn();
+    };
+  }
   function hostOf(url) { try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } }
   function dayColours(n) {
     var r = record(n), cols = [];
@@ -1234,24 +1330,28 @@
       art.appendChild(t);
     });
   }
-  function showShot(g) {
-    var shot = $('#rvShot'), img = $('#rvImg'), art = $('#gameArt');
-    shot.href = g.url;
-    $('#rvHost').textContent = hostOf(g.url);
-    function fallback() { shot.hidden = true; art.hidden = false; gameTiles(g); }
-    if (!g.img) { fallback(); return; }
-    shot.hidden = false; art.hidden = true;
-    if (img.getAttribute('src') !== g.img) {
+  function setShot(shot, url, src, fallback) {   // a screenshot in a little browser window
+    var img = $('img', shot);
+    shot.href = url;
+    $('.bar b', shot).textContent = hostOf(url);
+    if (!src) { fallback(); return; }
+    shot.hidden = false;
+    if (img.getAttribute('src') !== src) {
       img.classList.remove('ok');
       img.onload = function () { img.classList.add('ok'); };
       img.onerror = fallback;
-      img.src = g.img;
+      img.src = src;
       if (img.complete && img.naturalWidth) img.classList.add('ok');
     }
   }
-  function showReveal(n, fresh) {
-    var d = DAY[n]; if (!d) return;
-    var g = d.game, today = fresh || dayKey(d.at) === dayKey(now());
+  function showShot(g) {
+    var shot = $('#rvShot'), art = $('#gameArt');
+    art.hidden = true;
+    setShot(shot, g.url, g.img, function () { shot.hidden = true; art.hidden = false; gameTiles(g); });
+  }
+  function playIn(el) { el.classList.remove('anim'); void el.offsetWidth; if (!reduceMotion) el.classList.add('anim'); }
+  function fillReveal(n, fresh) {
+    var d = DAY[n], g = d.game, today = fresh || dayKey(d.at) === dayKey(now());
     var dl = $('#rvDay'); dl.textContent = 'Day ' + n + ' · ' + fmtDate(d.at);
     var cols = dayColours(n);
     if (cols.length) {
@@ -1267,13 +1367,18 @@
     $('#rvPlay').href = g.url;
     $('#rvBlurb').textContent = g.blurb || '';
     showShot(g);
-    var rv = $('#reveal');
-    rv.classList.remove('anim'); void rv.offsetWidth; if (!reduceMotion) rv.classList.add('anim');
-    var go = function () { markOpened(n); };
+    var go = guardLinks(function () { markOpened(n); });
     link.onclick = go; $('#rvPlay').onclick = go; $('#rvShot').onclick = go;
+  }
+  // slides up: right after a day is locked in, or after tapping that day on the picture
+  function showReveal(n, fresh) {
+    if (!DAY[n]) return;
+    fillReveal(n, fresh);
+    playIn($('#reveal'));
     $('#revealSheet').scrollTop = 0;
     openOverlay($('#revealSheet'));
-    revealFor = n; revealFresh = !!fresh;
+    shownAt = performance.now();
+    revealFor = n; revealFresh = !!fresh; revealFrom = null; revealUnder = null;
     if (fresh && !reduceMotion) {
       setTimeout(function () {
         var r = $('#revealSheet').getBoundingClientRect();
@@ -1281,10 +1386,32 @@
       }, 420);
     }
   }
+  // grows out of the button that was tapped ("Today's game", a shelf row); `under` = a sheet that stays open beneath it
+  function openCard(n, from, under) {
+    if (morphBusy || !DAY[n] || $('#revealSheet').classList.contains('on')) return;
+    if (under) { under.classList.add('under'); keepInView(from, under); }
+    fillReveal(n, false);
+    revealFor = n; revealFresh = false; revealFrom = from || null; revealUnder = under || null;
+    selectDay(n);
+    var rv = $('#reveal'), sheet = $('#revealSheet');
+    rv.classList.remove('anim');
+    if (morphable(from)) growInto(sheet, from, function () { playIn(rv); shownAt = performance.now(); });
+    else { playIn(rv); sheet.scrollTop = 0; openOverlay(sheet); shownAt = performance.now(); }
+  }
+  function keepInView(el, sheet) {
+    var r = el.getBoundingClientRect(), b = sheet.getBoundingClientRect();
+    if (r.top < b.top + 6) sheet.scrollTop -= b.top + 6 - r.top;
+    else if (r.bottom > b.bottom - 6) sheet.scrollTop += r.bottom - (b.bottom - 6);
+  }
   function closeReveal() {
-    var n = revealFor, fresh = revealFresh; revealFor = null; revealFresh = false;
-    closeOverlays();
+    if (morphBusy) return;
+    var n = revealFor, fresh = revealFresh, from = revealFrom, under = revealUnder;
+    revealFor = null; revealFresh = false; revealFrom = null; revealUnder = null;
+    var sheet = $('#revealSheet'), stacked = !!(under && under.classList.contains('on'));
+    if (under) under.classList.remove('under');
     clearSel();
+    if (from && morphable(from)) { shrinkInto(sheet, from, stacked); return; }   // back into its button
+    if (stacked) closeSheet(sheet); else closeOverlays();
     if (!fresh) return;
     var before = phase();
     render();
@@ -1320,15 +1447,13 @@
       if (isDone(d.n)) {
         var c = mainColour(d.n); dot.style.background = c; dot.style.color = contrastInk(c);
         b.textContent = d.game.name; s.textContent = 'Day ' + d.n + ' · ' + fmtDate(d.at);
-        var a = document.createElement('a'); a.className = 'go'; a.href = d.game.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Play ↗';
-        a.addEventListener('click', function () { markOpened(d.n); });
-        meta.appendChild(b); meta.appendChild(s); li.appendChild(dot); li.appendChild(meta); li.appendChild(a);
-        li.className = 'tap';   // the rest of the row opens that day's game card
-        li.addEventListener('click', function (e) {
-          if (e.target.closest('a')) return;
-          closeOverlays();
-          setTimeout(function () { openDay(d.n); }, 240);
-        });
+        var more = document.createElement('span'); more.className = 'more';
+        more.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 6.5 15 12l-5.5 5.5"/></svg>';
+        meta.appendChild(b); meta.appendChild(s); li.appendChild(dot); li.appendChild(meta); li.appendChild(more);
+        li.className = 'tap';   // opens that day's game card on top of the shelf (the card links to the game)
+        li.tabIndex = 0; li.setAttribute('role', 'button'); li.setAttribute('aria-label', 'Day ' + d.n + ': ' + d.game.name);
+        li.addEventListener('click', function () { openCard(d.n, li, $('#shelfSheet')); });
+        li.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); li.click(); } });
       } else {
         li.className = 'future';
         var isNow = ph === 'colour' && cur && cur.n === d.n;
@@ -1339,12 +1464,97 @@
       }
       ul.appendChild(li);
     });
+    $('#shelfSheet').classList.remove('under');
     openOverlay($('#shelfSheet'));
   }
   function contrastInk(hex) {
     if (!isHex(hex)) return INK;
     var r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
     return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? INK : '#fff';
+  }
+
+  /* ======================================================================
+     THE GRAND PRIZE (once every spot is coloured in)
+     ====================================================================== */
+  var PRIZE = C.prize && C.prize.title && C.prize.url ? C.prize : null;
+  var prizeRun = 0, giftAnims = [];
+  function prizeKey() { return 'prize' + (MODE === 'real' ? '' : ':' + MODE); }
+  function prizeSeen() { return !!pref(prizeKey()); }
+  function renderDone() {
+    var seen = prizeSeen();
+    $('#prizeCta').hidden = !PRIZE || seen;
+    $('#prizeBtn').hidden = !PRIZE || !seen;
+    $('#saveBtn').hidden = !!PRIZE && !seen;   // until the prize is revealed, its button has the row to itself
+    if (PRIZE) $('#prizeCtaLbl').textContent = PRIZE.button || 'Click to reveal your grand prize';
+  }
+  function fillPrize() {
+    var P = PRIZE, h = $('#pzTitle'), t = String(P.title), k = P.link ? t.indexOf(P.link) : -1;
+    var a = document.createElement('a'); a.href = P.url; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = k >= 0 ? P.link : t;
+    h.textContent = '';
+    if (k >= 0) { h.appendChild(document.createTextNode(t.slice(0, k))); h.appendChild(a); h.appendChild(document.createTextNode(t.slice(k + P.link.length))); }
+    else h.appendChild(a);
+    var bl = $('#pzBlurb'); bl.textContent = P.blurb || ''; bl.hidden = !P.blurb;
+    $('#pzGo').href = P.url; $('#pzGoLbl').textContent = P.go || 'Take a look';
+    var box = $('#prize'), shot = $('#pzShot');
+    box.classList.toggle('noimg', !P.img);
+    setShot(shot, P.url, P.img, function () { shot.hidden = true; box.classList.add('noimg'); });
+    var guard = guardLinks(null);
+    a.onclick = guard; $('#pzGo').onclick = guard; shot.onclick = guard;
+  }
+  function openPrize(from) {
+    if (!PRIZE || morphBusy || $('#prizeSheet').classList.contains('on')) return;
+    fillPrize();
+    var box = $('#prize'), sheet = $('#prizeSheet'), first = !prizeSeen(), run = ++prizeRun;
+    stopGift();
+    box.classList.remove('anim', 'wrapped', 'opened');
+    if (first && !reduceMotion) box.classList.add('wrapped');   // it arrives gift-wrapped the first time
+    if (first) pref(prizeKey(), '1');
+    function start() {
+      shownAt = performance.now();
+      if (box.classList.contains('wrapped')) unwrap(run); else playIn(box);
+      renderDone();   // from now on the panel shows "Grand prize" + "Save picture"
+    }
+    if (morphable(from)) growInto(sheet, from, start);
+    else { sheet.scrollTop = 0; openOverlay(sheet); start(); }
+  }
+  function stopGift() { giftAnims.forEach(function (a) { try { a.cancel(); } catch (e) { /* ignore */ } }); giftAnims = []; }
+  // the gift pops in, has a little shake, then the lid flies off and the prize rises out of it
+  function unwrap(run) {
+    var box = $('#prize'), gift = $('#gift'), lid = $('.g-lid', gift), base = $('.g-box', gift), glow = $('.g-glow', gift), tag = $('.tag', box);
+    function an(el, kf, opt) { var a = el.animate(kf, opt); giftAnims.push(a); return a; }
+    function at(ms, fn) { setTimeout(function () { if (run === prizeRun) fn(); }, ms); }
+    function open() { box.classList.add('opened'); box.classList.remove('wrapped'); playIn(box); }
+    gift.style.display = 'block';
+    an(tag, [{ opacity: 0, transform: 'translateY(18px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 350, easing: 'cubic-bezier(.2,.9,.25,1.15)', fill: 'backwards' });
+    an(gift, [{ transform: 'translateY(26px) scale(.3) rotate(-14deg)', opacity: 0 }, { transform: 'translateY(-6px) scale(1.07) rotate(3deg)', opacity: 1, offset: 0.62 }, { transform: 'none', opacity: 1 }],
+      { duration: 620, easing: 'cubic-bezier(.2,.9,.3,1)' });
+    an(glow, [{ opacity: 0.35, transform: 'scale(1.1)' }, { opacity: 0.9, transform: 'scale(1.5)' }, { opacity: 0.35, transform: 'scale(1.1)' }], { duration: 900, iterations: 2, easing: 'ease-in-out' });
+    at(700, function () {
+      an(gift, [{ transform: 'none' }, { transform: 'rotate(-9deg)', offset: 0.15 }, { transform: 'rotate(8deg)', offset: 0.35 }, { transform: 'rotate(-6deg)', offset: 0.55 }, { transform: 'rotate(4deg)', offset: 0.75 }, { transform: 'none' }],
+        { duration: 650, easing: 'ease-in-out' });
+    });
+    at(1400, function () {   // pop!
+      var r = gift.getBoundingClientRect();
+      burst(r.left + r.width / 2, r.top + r.height * 0.42, ['#ffd65c', '#ff7f6e', '#a8e3cf', '#cdbcf5', '#b3ddf6', '#ff8fab', '#ffffff'], 110, 1.05);
+      if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) { try { navigator.vibrate([14, 50, 22]); } catch (e) { /* ignore */ } }
+      an(glow, [{ opacity: 0.9, transform: 'scale(1.2)' }, { opacity: 0, transform: 'scale(2.2)' }], { duration: 650, easing: 'ease-out', fill: 'forwards' });
+      if (box.classList.contains('noimg')) { open(); gift.style.display = ''; return; }   // no picture: the gift stays as it is
+      an(lid, [{ transform: 'none', opacity: 1 }, { transform: 'translate(16px, -70px) rotate(26deg)', opacity: 1, offset: 0.55 }, { transform: 'translate(30px, -96px) rotate(40deg)', opacity: 0 }],
+        { duration: 640, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' });
+      an(base, [{ transform: 'none', opacity: 1 }, { transform: 'translateY(5px) scale(1.06, .88)', opacity: 1, offset: 0.3 }, { transform: 'translateY(34px) scale(.6)', opacity: 0 }],
+        { duration: 380, delay: 60, easing: 'ease-in', fill: 'forwards' });
+      at(240, open);
+      at(1100, function () { gift.style.display = ''; stopGift(); });
+    });
+  }
+  function closePrize() {
+    if (morphBusy) return;
+    prizeRun++;   // stops the unwrapping if it's still going
+    var sheet = $('#prizeSheet'), box = $('#prize'), to = $('#prizeBtn');
+    function tidy() { stopGift(); box.classList.remove('wrapped'); $('#gift').style.display = ''; }
+    if (morphable(to)) shrinkInto(sheet, to, false, tidy);
+    else { closeOverlays(); setTimeout(tidy, 650); }
   }
 
   /* ======================================================================
@@ -1439,7 +1649,7 @@
     updateShelfDot();
     $('#zFocus').hidden = !canColour() || todayIds().length === 0;
     $('#sizes').classList.toggle('off', tool !== 'brush' || !canColour());
-    if (ph === 'complete') showPane('complete');
+    if (ph === 'complete') { showPane('complete'); renderDone(); }
     else if (ph === 'wait' || MODE === 'view') { showPane('wait'); renderWait(); }
     else { showPane('colour'); setTool(tool); updateDone(); updatePrompt(); }
     lastPhase = ph;
@@ -1456,7 +1666,7 @@
 
   // live unlock at 6pm while the page is open
   function heartbeat() {
-    if (!booted) return;
+    if (!booted || morphBusy) return;
     if (remoteDirty) flushRemote();
     var ph = phase();
     if (ph !== lastPhase) {
@@ -1565,6 +1775,7 @@
     try {
       localStorage.removeItem(KEY); localStorage.removeItem(KEY + ':bak'); localStorage.removeItem(KEY + ':clock');
       localStorage.removeItem('jfm-pref:welcomed:' + MODE); localStorage.removeItem('jfm-pref:tip-tap:' + MODE);
+      localStorage.removeItem('jfm-pref:prize:' + MODE);
     } catch (e) { /* ignore */ }
     location.reload();
   }
@@ -1600,6 +1811,7 @@
     });
     state = { v: 1, days: days, draft: null, opened: {} };
     save(false, true);
+    try { localStorage.removeItem('jfm-pref:prize:' + MODE); } catch (e) { /* ignore */ }   // the prize is wrapped again
     // and set the pretend clock to just after that day unlocks
     var last = DAYS[DAYS.length - 1];
     setClock(v === 'end' ? (last ? last.at : Date.now()) + 3600 * 1000 : DAY[+v].at + 1500);
@@ -1671,7 +1883,8 @@
   function dismissTop() {
     if ($('#welcome').classList.contains('on')) $('#wGo').click();
     else if ($('#revealSheet').classList.contains('on')) closeReveal();
-    else closeOverlays();
+    else if ($('#prizeSheet').classList.contains('on')) closePrize();
+    else if (!morphBusy) closeOverlays();
   }
   function maybeWelcome(wait) {
     if (params.has('admin') || MODE === 'view') return;
@@ -1717,8 +1930,11 @@
     $('#cfNo').addEventListener('click', closeOverlays);
     $('#cfYes').addEventListener('click', lockIn);
     $('#rvBack').addEventListener('click', closeReveal);
+    $('#gameChip').addEventListener('click', function () { var n = +this.dataset.n; if (DAY[n]) openCard(n, this); });
+    $('#prizeCta').addEventListener('click', function () { openPrize(this); });
+    $('#prizeBtn').addEventListener('click', function () { openPrize(this); });
+    $('#pzBack').addEventListener('click', closePrize);
     $('#shelfBtn').addEventListener('click', openShelf);
-    $('#shelfBtn2').addEventListener('click', openShelf);
     $('#shelfClose').addEventListener('click', closeOverlays);
     $('#saveBtn').addEventListener('click', exportPNG);
     $('#scrim').addEventListener('click', dismissTop);
@@ -1735,7 +1951,9 @@
       sh.addEventListener('touchstart', function (e) { sy = sh.scrollTop <= 0 ? e.touches[0].clientY : null; }, { passive: true });
       sh.addEventListener('touchend', function (e) {
         if (sy == null) return;
-        if (e.changedTouches[0].clientY - sy > 90) { if (sh.id === 'revealSheet') closeReveal(); else closeOverlays(); }
+        if (e.changedTouches[0].clientY - sy > 90) {
+          if (sh.id === 'revealSheet') closeReveal(); else if (sh.id === 'prizeSheet') closePrize(); else if (!morphBusy) closeOverlays();
+        }
         sy = null;
       });
     });

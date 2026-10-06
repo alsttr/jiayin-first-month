@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=4">
+<link rel="stylesheet" href="css/styles.css?v=5">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i></div>
@@ -69,7 +69,7 @@
         <div class="cd-unit"><div class="cd-box" id="cdS"><span>00</span></div><div class="cd-lab">sec</div></div>
       </div>
       <div class="when" id="waitWhen"></div>
-      <a class="chip" id="gameChip" target="_blank" rel="noopener" hidden><span class="ico">🎮</span><span class="lbl" id="chipLbl">Today's game</span><span class="nm" id="chipName"></span></a>
+      <button class="chip" id="gameChip" type="button" aria-haspopup="dialog" hidden><span class="ico">🎮</span><span class="lbl" id="chipLbl">Today’s game:</span><span class="nm" id="chipName"></span><svg class="more" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 6.5 15 12l-5.5 5.5"/></svg></button>
     </div>
 
     <!-- colouring -->
@@ -102,8 +102,9 @@
       <h2>Congrats on your first month of work, baby! 🎉</h2>
       <p>You made it, and now you’ve earned your WFH days.</p>
       <div class="row">
-        <button class="btn butter sm" id="saveBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5"/><path d="M5 19.5h14"/></svg>Save picture</button>
-        <button class="btn ghost sm" id="shelfBtn2">All 21 games</button>
+        <button class="btn prize-cta" id="prizeCta" aria-haspopup="dialog" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="8.5" width="17" height="4.5" rx="1.2"/><path d="M5 13v6.3a1.2 1.2 0 0 0 1.2 1.2h11.6a1.2 1.2 0 0 0 1.2-1.2V13"/><path d="M12 8.5v12"/><path d="M12 8.5S10.6 4 8 4.2C6 4.4 6.2 7.6 8.6 8.2M12 8.5s1.4-4.5 4-4.3c2 .2 1.8 3.4-.6 4"/></svg><span id="prizeCtaLbl">Click to reveal your grand prize</span></button>
+        <button class="btn butter sm" id="prizeBtn" aria-haspopup="dialog" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="8.5" width="17" height="4.5" rx="1.2"/><path d="M5 13v6.3a1.2 1.2 0 0 0 1.2 1.2h11.6a1.2 1.2 0 0 0 1.2-1.2V13"/><path d="M12 8.5v12"/><path d="M12 8.5S10.6 4 8 4.2C6 4.4 6.2 7.6 8.6 8.2M12 8.5s1.4-4.5 4-4.3c2 .2 1.8 3.4-.6 4"/></svg>Grand prize</button>
+        <button class="btn ghost sm" id="saveBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5"/><path d="M5 19.5h14"/></svg>Save picture</button>
       </div>
     </div>
   </section>
@@ -150,6 +151,29 @@
   </div>
 </div>
 
+<!-- the grand prize (once all 21 spots are coloured) -->
+<div class="sheet" id="prizeSheet" role="dialog" aria-modal="true" aria-labelledby="pzTitle">
+  <div class="grab"></div>
+  <div class="reveal prize" id="prize">
+    <div class="prize-pic">
+      <a class="shot" id="pzShot" href="#" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true" hidden>
+        <span class="bar"><i></i><i></i><i></i><b></b></span>
+        <span class="pic"><img alt="" decoding="async"></span>
+      </a>
+      <div class="gift" id="gift" aria-hidden="true">
+        <i class="g-glow"></i>
+        <svg class="g-box" viewBox="0 0 120 120"><rect x="25" y="57" width="70" height="50" rx="9" fill="#ff8a7a" stroke="#3b3330" stroke-width="3.2"/><path d="M53 57h14v50H53z" fill="#ffd65c" stroke="#3b3330" stroke-width="3.2" stroke-linejoin="round"/><path d="M33 66v14" stroke="#fff" stroke-opacity=".55" stroke-width="4" stroke-linecap="round"/></svg>
+        <svg class="g-lid" viewBox="0 0 120 120"><path d="M60 41C51 25 34 24 37 35c2 7 15 8 23 6zM60 41c9-16 26-17 23-6-2 7-15 8-23 6z" fill="#ffd65c" stroke="#3b3330" stroke-width="3.2" stroke-linejoin="round"/><rect x="19" y="41" width="82" height="19" rx="7" fill="#ff7f6e" stroke="#3b3330" stroke-width="3.2"/><path d="M53 41h14v19H53z" fill="#ffd65c" stroke="#3b3330" stroke-width="3.2" stroke-linejoin="round"/><circle cx="60" cy="41" r="6.5" fill="#ffd65c" stroke="#3b3330" stroke-width="3.2"/></svg>
+      </div>
+    </div>
+    <div class="tag">✨ Your grand prize ✨</div>
+    <h2 id="pzTitle">A getaway!</h2>
+    <p class="blurb" id="pzBlurb" hidden></p>
+    <a class="btn wide" id="pzGo" href="#" target="_blank" rel="noopener"><span id="pzGoLbl">Take a look</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+    <button class="linkbtn" id="pzBack">Back to my picture</button>
+  </div>
+</div>
+
 <!-- game shelf -->
 <div class="sheet" id="shelfSheet" role="dialog" aria-modal="true" aria-labelledby="shTitle">
   <div class="grab"></div>
@@ -164,9 +188,9 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <canvas id="fx" aria-hidden="true"></canvas>
 
-<script src="js/config.js?v=4"></script>
-<script src="js/art.js?v=4"></script>
-<script src="js/hand.js?v=4"></script>
-<script src="js/app.js?v=4"></script>
+<script src="js/config.js?v=5"></script>
+<script src="js/art.js?v=5"></script>
+<script src="js/hand.js?v=5"></script>
+<script src="js/app.js?v=5"></script>
 </body>
 </html>

@@ -4,6 +4,8 @@ A digital version of the hand-drawn colour-by-number card. Every evening at **6p
 number unlocks: its spots glow, she colours them in (paint-bucket **Fill** or **Brush**, always inside the
 lines), confirms with a "no take-backs" warning, and the **game of the day** is revealed. Afterwards she can
 tap any coloured part of the picture to see that day's game again (with a screenshot of it).
+When all 21 are coloured she gets **Click to reveal your grand prize** — a gift that pops open into
+*a getaway at The Residence in Bintan*, linked to their website.
 
 Works in any phone or computer browser — nothing to install.
 
@@ -28,12 +30,12 @@ Unlocks at 6pm SGT on each date. Thursdays have the shorter games. 🇸🇬 = Si
 | 3 | Wed 7 Oct | mountain | [Betweenle](https://betweenle.com/) |  |
 | 4 | Thu 8 Oct | right tree trunk | [Angle](https://angle.wtf/) | short (Thu) |
 | 5 | Fri 9 Oct | left tree trunk | [Connections](https://www.nytimes.com/games/connections) |  |
-| 6 | Sat 10 Oct | left tree leaves | [TimeGuessr](https://timeguessr.com/play?mode=daily) | the weekend one |
+| 6 | Sat 10 Oct | left tree leaves | [TimeGuessr](https://timeguessr.com/) | the weekend one |
 | 7 | Mon 12 Oct | right tree leaves | [Word-leh!](https://word-leh.com/) | 🇸🇬 Singlish Wordle |
 | 8 | Tue 13 Oct | 1 fruit | [Krillion](https://krillion.io/) |  |
 | 9 | Wed 14 Oct | 3 fruits | [Travle](https://travle.earth/) |  |
 | 10 | Thu 15 Oct | 3 fruits | [Worldle](https://worldle.teuteuf.fr/) | short (Thu) |
-| 11 | Fri 16 Oct | 1 fruit | [Geodle: MRT](https://geodle.vercel.app/sg-mrt-lrt) | 🇸🇬 MRT/LRT stations |
+| 11 | Fri 16 Oct | 1 fruit | [Geodle: MRT](https://geodle.vercel.app/) | 🇸🇬 pick "Singapore MRT & LRT Stations" |
 | 12 | Mon 19 Oct | hill | [Wordiply](https://www.wordiply.com/) | longest word around a starter word |
 | 13 | Tue 20 Oct | small flowers' leaf + stems | [Metazooa](https://metazooa.com/) |  |
 | 14 | Wed 21 Oct | tulip | [Bandle](https://bandle.app/) |  |
@@ -41,12 +43,15 @@ Unlocks at 6pm SGT on each date. Thursdays have the shorter games. 🇸🇬 = Si
 | 16 | Fri 23 Oct | big flower's right leaf + stem | [FoodGuessr](https://www.foodguessr.com/) |  |
 | 17 | Mon 26 Oct | the two small flowers | [Contexto](https://contexto.me/) |  |
 | 18 | Tue 27 Oct | grass/ground + tulip's left leaf | [MRT Guessr](https://mrt.ratgames.studio/) | 🇸🇬 (Daily Challenge) |
-| 19 | Wed 28 Oct | tulip's right leaf + stem | [Waffle](https://wafflegame.net/daily) |  |
+| 19 | Wed 28 Oct | tulip's right leaf + stem | [Waffle](https://wafflegame.net/) |  |
 | 20 | Thu 29 Oct | big flower (centre + petals) | [Framed](https://framed.wtf/) | short (Thu) |
 | 21 | Fri 30 Oct | sky | [Globle](https://globle-game.com/) | the finale 🎉 |
 
 Every link was checked on 6 Oct 2026: all free, all with a daily puzzle, all playable without signing up
-(a few show an optional "log in" button that can be ignored).
+(a few show an optional "log in" button that can be ignored). Every link goes to the game's **home page**,
+never straight into the day's puzzle (so nothing starts by surprise — TimeGuessr's daily link used to).
+
+**After Day 21 — the grand prize:** a getaway at [The Residence Bintan](https://www.cenizaro.com/theresidence/bintan).
 
 ### How the drawing was mapped
 * Numbers were read from the photo. The fruits are tiny, so these are best readings:
@@ -66,8 +71,11 @@ Everything editable is in **`js/config.js`** (plain text, commented):
 
 * **Dates / unlock time** — `days[].date`, `unlockHour`.
 * **Games** — `days[].game` (`name`, `url`, `blurb`, and `img`: the screenshot shown with it, in `assets/games/`).
+  Keep `url` on the game's home page rather than a link that starts the day's game.
   To swap a game's picture, drop any phone screenshot of it in `assets/games/` (portrait, roughly 480×600 JPG is plenty)
   and point `img` at it; delete the `img` line and the card shows little letter tiles instead.
+* **The grand prize** — `prize`: the button text, the title (`link` = the part of the title that's linked),
+  `url`, the picture (`assets/prize.jpg`, a screenshot of the resort's website), an optional `blurb` and the button label.
 * **Which part is which number** — `regions`.
 * **Colour palette** — `palette`. (She can also mix any colour with the **+** bubble; her mixes are kept as extra swatches.)
 * **The numbers on the picture** are drawn in the handwriting from the real card (`js/hand.js`, traced by
@@ -79,7 +87,7 @@ Then publish the change (from this folder):
 git add -A && git commit -m "Update schedule" && git push
 ```
 
-GitHub Pages updates the live site in about a minute. (Tip: bump the `?v=4` numbers in `index.html`
+GitHub Pages updates the live site in about a minute. (Tip: bump the `?v=5` numbers in `index.html`
 when you change CSS/JS so phones fetch the fresh files straight away.) Edits to games/dates never erase what she has already
 coloured — that lives in the database (and on her phone).
 
@@ -110,7 +118,8 @@ https://supabase.com/dashboard/project/edvmiplelrueckisnumm — table `jfm_days`
   It opens as the next spot unlocks, so you can colour straight away. After **Lock it in** you see exactly what
   she sees: the waiting screen with the countdown, and the picture where every coloured part can be tapped to
   show its game. **⏩ 6pm** jumps to a few seconds before the next unlock so you can watch it open live.
-  "Jump to…" goes to any day (earlier days get sample colours); **Reset** starts over. Nothing is saved online.
+  "Jump to…" goes to any day (earlier days get sample colours) — **All done** shows the grand prize button;
+  **Reset** starts over (and wraps the prize up again). Nothing is saved online.
 * `?preview=` + any Singapore date/time pretends it's that moment (great for checking countdowns), e.g.
   https://alsttr.github.io/jiayin-first-month/?preview=2026-10-06T17:59 — watch Day 2 unlock live.
   Also sandboxed and never saved online.
@@ -130,7 +139,10 @@ time it opens the site, and she can colour it again.
 * If several days are missed, they queue up: she colours them in order and gets each day's game.
 * If the page is open at 6pm, the new spot unlocks live with a little celebration.
 * Any coloured part of the picture can be tapped (once that day is locked in) to bring back its game card:
-  screenshot, description and **Let's play**. The game shelf (🎮 button) lists them all too.
+  screenshot, description and **Let's play**. On the waiting screen, **Today's game** grows into that card, and the
+  game shelf (🎮 button) lists every game — each row opens its card. The game itself is only ever linked from a card.
+* After all 21: **Click to reveal your grand prize** (first time: a gift shakes and pops open). Afterwards the panel has
+  **Grand prize** (to see it again) and **Save picture**.
 * At the end she can **Save picture** (PNG of the finished drawing, numbers removed).
 
 ## Files
@@ -144,6 +156,7 @@ js/art.js             the digitised drawing (generated)
 js/hand.js            the numbers, in the card's handwriting (generated)
 assets/               icons + link-preview image
 assets/games/         a screenshot of each game (shown on its game card)
+assets/prize.jpg      the grand prize picture (screenshot of The Residence Bintan's website)
 tools/pipeline/       Python scripts used to trace the photo into vector art + digits (photo not included)
 test/, view/          short links that open the test and view-only versions
 supabase/migrations/  database schema + rules (Supabase)

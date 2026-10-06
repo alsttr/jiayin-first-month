@@ -47,6 +47,7 @@ body {
 }
 button { font: inherit; color: inherit; }
 a { color: inherit; }
+[hidden] { display: none !important; }
 
 /* ---------- dreamy background ---------- */
 .bg { position: fixed; inset: 0; overflow: hidden; z-index: 0; pointer-events: none;
@@ -152,9 +153,12 @@ a { color: inherit; }
 .cd-lab { font-size: 11px; font-weight: 500; color: var(--ink-soft); margin-top: 3px; text-transform: lowercase; }
 .cd-sep { font-size: 26px; font-weight: 600; color: var(--ink-faint); padding-bottom: 24px; }
 .when { font-family: var(--font-round); font-weight: 500; font-size: 14px; color: var(--ink); }
-.chip { margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px 8px 10px; border-radius: 999px; text-decoration: none;
-  background: var(--butter-soft); box-shadow: inset 0 0 0 1.5px rgba(244, 194, 27, .35); font-weight: 700; font-size: 14px; transition: transform .25s var(--spring); max-width: 100%; }
+.chip { margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px 8px 10px; border: 0; border-radius: 999px; text-decoration: none; cursor: pointer;
+  background: var(--butter-soft); box-shadow: inset 0 0 0 1.5px rgba(244, 194, 27, .35); color: var(--ink); font-weight: 700; font-size: 14px; line-height: 1.25;
+  transition: transform .25s var(--spring), box-shadow .2s; max-width: 100%; -webkit-appearance: none; appearance: none; }
 .chip:active { transform: scale(.95); }
+.chip .more { width: 15px; height: 15px; flex: 0 0 auto; margin-left: -2px; color: var(--ink-soft); }
+@media (hover: hover) { .chip:hover { box-shadow: inset 0 0 0 1.5px rgba(244, 194, 27, .7), 0 4px 12px rgba(230, 181, 45, .2); } }
 .chip .ico { width: 24px; height: 24px; border-radius: 50%; background: var(--butter); display: grid; place-items: center; font-size: 13px; flex: 0 0 auto; }
 .chip .lbl { font-weight: 600; color: var(--ink-soft); }
 .chip .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -235,6 +239,16 @@ a { color: inherit; }
 .done-pane h2 { margin: 0; font-family: var(--font-round); font-weight: 600; font-size: 22px; }
 .done-pane p { margin: 0 0 8px; color: var(--ink-soft); font-weight: 600; font-size: 14px; }
 .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.done-pane .row { width: 100%; }
+.done-pane .btn.sm { padding: 0 15px; gap: 6px; font-size: 15.5px; }
+.btn.prize-cta { width: 100%; max-width: 340px; padding: 0 14px; gap: 8px; font-size: clamp(14.5px, 4.3vw, 17px); overflow: hidden;
+  animation: readyNudge 2.6s ease-in-out infinite; }
+.btn.prize-cta svg { width: 22px; height: 22px; flex: 0 0 auto; }
+.btn.prize-cta span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn.prize-cta::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, .45) 50%, transparent 68%) no-repeat 160% 0 / 220% 100%;
+  animation: ctaShine 3.4s ease-in-out .8s infinite; }
+@keyframes ctaShine { 0% { background-position: 160% 0; } 40%, 100% { background-position: -60% 0; } }
 
 /* ---------- overlays ---------- */
 .scrim { position: fixed; inset: 0; z-index: 20; background: rgba(70, 45, 35, .28); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
@@ -260,6 +274,13 @@ a { color: inherit; }
   padding: 10px 22px calc(22px + env(safe-area-inset-bottom)); border-radius: 30px 30px 0 0; background: var(--paper); box-shadow: var(--shadow-lg);
   transform: translateY(105%); transition: transform .6s var(--spring); overscroll-behavior: contain; }
 .sheet.on { transform: none; }
+#revealSheet { z-index: 31; }        /* a game card can open on top of the shelf */
+.sheet.under { pointer-events: none; }
+/* a button growing into its card (and shrinking back) */
+.morph { position: fixed; z-index: 32; pointer-events: none; }
+.morph > .m-face { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; margin: 0 !important;
+  max-width: none !important; transform: none !important; animation: none !important; transition: none !important; visibility: visible !important; }
+.morph > .m-bg { position: absolute; inset: 0; background: var(--paper); box-shadow: var(--shadow-lg); }
 .sheet .grab { width: 42px; height: 5px; border-radius: 3px; background: rgba(59, 51, 48, .15); margin: 2px auto 14px; }
 .sheet .x { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; border-radius: 50%; border: 0; background: rgba(59, 51, 48, .07); display: grid; place-items: center; cursor: pointer; }
 .sheet .x svg { width: 18px; height: 18px; }
@@ -302,6 +323,18 @@ a { color: inherit; }
 @keyframes rise { from { opacity: 0; transform: translateY(18px); } }
 @keyframes tilePop { from { opacity: 0; transform: scale(.2) rotate(-30deg); } }
 
+/* the grand prize: a gift pops open, then the card */
+.prize .tag { background: linear-gradient(90deg, var(--butter), #ffb8a8); }
+.prize-pic { position: relative; }
+.prize .shot { position: relative; z-index: 1; }
+.prize.opened .gift { z-index: 0; }      /* the prize bursts out in front of the box */
+.prize .gift { position: absolute; z-index: 2; left: 50%; top: 50%; width: 176px; height: 176px; margin: -88px 0 0 -88px; pointer-events: none; display: none; }
+.prize .gift > * { position: absolute; inset: 0; width: 100%; height: 100%; }
+.prize .g-glow { border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 214, 92, .8), rgba(255, 214, 92, 0)); transform: scale(1.35); opacity: .75; }
+.prize.wrapped .shot, .prize.wrapped h2, .prize.wrapped .blurb, .prize.wrapped .btn, .prize.wrapped .linkbtn { opacity: 0; pointer-events: none; }
+.reveal.prize.opened .tag { animation: none; }      /* it was already out, waiting under the gift */
+.prize.noimg .gift { display: block; position: relative; left: auto; top: auto; margin: 0 auto 6px; width: 120px; height: 120px; }
+
 .modal.welcome p { margin: 4px 6px 0; }
 .modal .badge.sun { background: #ffe58a; transform: rotate(8deg); }
 .modal.on .badge.sun svg { animation: spin 14s linear infinite; }
@@ -324,6 +357,8 @@ a { color: inherit; }
 .shelf .go { flex: 0 0 auto; height: 34px; padding: 0 14px; border-radius: 999px; background: var(--coral); color: #fff; text-decoration: none; display: inline-flex; align-items: center;
   font-family: var(--font-round); font-weight: 600; font-size: 14px; box-shadow: 0 3px 0 var(--coral-deep); }
 .shelf .lock { flex: 0 0 auto; font-size: 13px; font-weight: 700; color: var(--ink-faint); }
+.shelf .more { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(59, 51, 48, .06); color: var(--ink-soft); }
+.shelf .more svg { width: 16px; height: 16px; }
 
 /* toast */
 .toast { position: fixed; z-index: 40; left: 50%; bottom: calc(var(--dock-h) + env(safe-area-inset-bottom) + 14px); width: max-content; max-width: calc(100vw - 32px); line-height: 1.35;
@@ -382,7 +417,7 @@ body.has-pv .app { padding-top: calc(env(safe-area-inset-top) + 30px); }
   .sheet { max-width: 660px; max-height: 94%; }
   .reveal { display: grid; grid-template-columns: auto 1fr; column-gap: 24px; align-items: center; text-align: left; padding-top: 2px; }
   .reveal > * { grid-column: 2; }
-  .reveal .shot, .reveal .game-art { grid-column: 1; grid-row: 1 / span 6; --shot-w: 150px; margin: 0; }
+  .reveal .shot, .reveal .game-art, .reveal .prize-pic { grid-column: 1; grid-row: 1 / span 6; --shot-w: 150px; margin: 0; }
   .reveal .tag, .reveal .linkbtn { justify-self: start; }
   .reveal h2 { margin: 6px 0; font-size: 26px; }
   .reveal .blurb { margin: 0 0 12px; }
