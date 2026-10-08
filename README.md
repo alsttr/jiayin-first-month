@@ -21,7 +21,7 @@ Don't colour on her link yourself — anything locked there is saved to *her* pi
 
 ## The schedule
 
-Unlocks at 6pm SGT on each date. Thursdays have the shorter games. 🇸🇬 = Singapore variants.
+Unlocks at 6pm SGT on each date. Thursdays have the shorter games (Thu 8 and 22 Oct have two). 🇸🇬 = Singapore variants.
 
 | # | Date | What she colours | Game of the day | Notes |
 |---|------|------------------|-----------------|-------|
@@ -32,14 +32,14 @@ Unlocks at 6pm SGT on each date. Thursdays have the shorter games. 🇸🇬 = Si
 | 5 | Fri 9 Oct | left tree trunk | a PUBG match ([PUBG Mobile](https://www.pubgmobile.com/en-US/home.shtml)) | together, on your phones |
 | 6 | Sat 10 Oct | left tree leaves | [TimeGuessr](https://timeguessr.com/) | the weekend one |
 | 7 | Mon 12 Oct | right tree leaves | [Word-leh!](https://word-leh.com/) | 🇸🇬 Singlish Wordle |
-| 8 | Tue 13 Oct | 1 fruit | [Krillion](https://krillion.io/) |  |
+| 8 | Tue 13 Oct | 1 fruit | [Size It Up](https://magnitudle.com/) | guess how big things really are |
 | 9 | Wed 14 Oct | 3 fruits | [Travle](https://travle.earth/) |  |
 | 10 | Thu 15 Oct | 3 fruits | [Worldle](https://worldle.teuteuf.fr/) | short (Thu) |
 | 11 | Fri 16 Oct | 1 fruit | [Geodle: MRT](https://geodle.vercel.app/) | 🇸🇬 pick "Singapore MRT & LRT Stations" |
 | 12 | Mon 19 Oct | hill | [Wordiply](https://www.wordiply.com/) | longest word around a starter word |
 | 13 | Tue 20 Oct | small flowers' leaf + stems | [Metazooa](https://metazooa.com/) |  |
-| 14 | Wed 21 Oct | tulip | [Bandle](https://bandle.app/) |  |
-| 15 | Thu 22 Oct | big flower's left leaf | [Costcodle](https://costcodle.com/) | short (Thu) |
+| 14 | Wed 21 Oct | tulip | [Bandle](https://bandle.app/) + [Quordle](https://www.merriam-webster.com/games/quordle/) | + a longer one |
+| 15 | Thu 22 Oct | big flower's left leaf | [Costcodle](https://costcodle.com/) + [Murdle](https://murdle.com/) | + a longer one (a daily whodunit) |
 | 16 | Fri 23 Oct | big flower's right leaf + stem | [FoodGuessr](https://www.foodguessr.com/) |  |
 | 17 | Mon 26 Oct | the two small flowers | [Contexto](https://contexto.me/) |  |
 | 18 | Tue 27 Oct | grass/ground + tulip's left leaf | [MRT Guessr](https://mrt.ratgames.studio/) | 🇸🇬 (Daily Challenge) |

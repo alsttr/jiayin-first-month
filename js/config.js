@@ -38,7 +38,7 @@ window.CONFIG = {
              say = how the card says it, if not just the name ("We're playing a PUBG match today!").
              Links go to each game's home page (not straight into the day's puzzle).
      games : instead of game, for a day with more than one — games: [ {...}, {...} ].
-     Thursdays use the shorter games.
+     Thursdays use the shorter games (Thu 8 and 22 Oct have a second one too).
      ------------------------------------------------------------------------ */
   days: [
     { n: 1,  date: '2026-10-05', game: { name: 'Wordle',      url: 'https://www.nytimes.com/games/wordle/index.html',   img: 'assets/games/wordle.jpg',      blurb: 'The classic. Guess the five-letter word in six tries.' } },
@@ -52,14 +52,18 @@ window.CONFIG = {
         blurb: 'Squad up, drop in together and go for that chicken dinner. 🍗' } },
     { n: 6,  date: '2026-10-10', game: { name: 'TimeGuessr',  url: 'https://timeguessr.com/',                           img: 'assets/games/timeguessr.jpg',  blurb: 'Five photos from history — guess where and when each was taken.' } },
     { n: 7,  date: '2026-10-12', game: { name: 'Word-leh!',   url: 'https://word-leh.com/',                             img: 'assets/games/word-leh.jpg',    blurb: 'Wordle, but make it Singlish. Steady lah.' } },
-    { n: 8,  date: '2026-10-13', game: { name: 'Krillion',    url: 'https://krillion.io/',                              img: 'assets/games/krillion.jpg',    blurb: 'Seven prompts, 25 seconds each — the rarer your answer, the deeper you dive.' } },
+    { n: 8,  date: '2026-10-13', game: { name: 'Size It Up',  url: 'https://magnitudle.com/',                           img: 'assets/games/size-it-up.jpg',  blurb: 'Stretch each mystery silhouette to its real size next to something you know. Five rounds.' } },
     { n: 9,  date: '2026-10-14', game: { name: 'Travle',      url: 'https://travle.earth/',                             img: 'assets/games/travle.jpg',      blurb: 'Hop from one country to another using only their neighbours.' } },
     { n: 10, date: '2026-10-15', game: { name: 'Worldle',     url: 'https://worldle.teuteuf.fr/',                       img: 'assets/games/worldle.jpg',     blurb: 'Name the country from its silhouette.' } },
     { n: 11, date: '2026-10-16', game: { name: 'Geodle: MRT', url: 'https://geodle.vercel.app/',                        img: 'assets/games/geodle-mrt.jpg',  blurb: 'Pick “Singapore MRT & LRT Stations”, then find the mystery station in six guesses.' } },
     { n: 12, date: '2026-10-19', game: { name: 'Wordiply',    url: 'https://www.wordiply.com/',                         img: 'assets/games/wordiply.jpg',    blurb: 'Five goes to build the longest word you can around the day’s starter word.' } },
     { n: 13, date: '2026-10-20', game: { name: 'Metazooa',    url: 'https://metazooa.com/',                             img: 'assets/games/metazooa.jpg',    blurb: 'Guess the mystery animal — each guess shows how closely related you are.' } },
-    { n: 14, date: '2026-10-21', game: { name: 'Bandle',      url: 'https://bandle.app/',                               img: 'assets/games/bandle.jpg',      blurb: 'Name the song as the band adds one instrument at a time.' } },
-    { n: 15, date: '2026-10-22', game: { name: 'Costcodle',   url: 'https://costcodle.com/',                            img: 'assets/games/costcodle.jpg',   blurb: 'Guess the price of a Costco find, higher-or-lower style.' } },
+    { n: 14, date: '2026-10-21', games: [
+        { name: 'Bandle',      url: 'https://bandle.app/',                               img: 'assets/games/bandle.jpg',      blurb: 'Name the song as the band adds one instrument at a time.' },
+        { name: 'Quordle',     url: 'https://www.merriam-webster.com/games/quordle/',    img: 'assets/games/quordle.jpg',     blurb: 'Four Wordles at once, nine guesses to crack them all.' } ] },
+    { n: 15, date: '2026-10-22', games: [
+        { name: 'Costcodle',   url: 'https://costcodle.com/',                            img: 'assets/games/costcodle.jpg',   blurb: 'Guess the price of a Costco find, higher-or-lower style.' },
+        { name: 'Murdle',      url: 'https://murdle.com/',                               img: 'assets/games/murdle.jpg',      blurb: 'A daily whodunit: use the clues to work out who did it, with what, and where.' } ] },
     { n: 16, date: '2026-10-23', game: { name: 'FoodGuessr',  url: 'https://www.foodguessr.com/',                       img: 'assets/games/foodguessr.jpg',  blurb: 'Guess where in the world each dish comes from.' } },
     { n: 17, date: '2026-10-26', game: { name: 'Contexto',    url: 'https://contexto.me/',                              img: 'assets/games/contexto.jpg',    blurb: 'Find the secret word — every guess tells you how close in meaning you are.' } },
     { n: 18, date: '2026-10-27', game: { name: 'MRT Guessr',  url: 'https://mrt.ratgames.studio/',                      img: 'assets/games/mrt-guessr.jpg',  blurb: 'Pin stations on a blank MRT map. Go for the Daily Challenge!' } },
