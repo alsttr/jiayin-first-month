@@ -72,9 +72,13 @@
   /* ======================================================================
      SCHEDULE + REGIONS
      ====================================================================== */
-  var DAYS = C.days.map(function (d) { return { n: d.n, date: d.date, game: d.game, at: unlockAt(d.date) }; })
+  var DAYS = C.days.map(function (d) {
+    var games = (d.games || [d.game]).filter(Boolean);   // a day has one game, or a few (games: [...])
+    return { n: d.n, date: d.date, games: games, game: games[0], at: unlockAt(d.date) };
+  })
     .sort(function (a, b) { return a.n - b.n; });
   var DAY = {}; DAYS.forEach(function (d) { DAY[d.n] = d; });
+  function namesOf(d) { return d.games.map(function (g) { return g.name; }).join(' + '); }
   var TOTAL = DAYS.length;
 
   var REG = {};
@@ -1053,7 +1057,7 @@
     var d = DAY[r.n];
     if (!d) return;
     if (isDone(r.n)) {
-      toast('Day ' + r.n + ' · ' + fmtDate(d.at) + ' · ' + d.game.name + ' 🎮', 3200);
+      toast('Day ' + r.n + ' · ' + fmtDate(d.at) + ' · ' + namesOf(d) + ' 🎮', 3200);
     } else if (d.at <= now()) {
       toast('Spot ' + r.n + ' is up next ✨', 2600);
     } else {
@@ -1102,12 +1106,12 @@
     $('#waitWhen').textContent = (ready ? 'Unlocked ' : '') + relDay(cur.at) + ' · ' + fmtTime(cur.at);
     var n = latestDone(), chip = $('#gameChip');
     if (n && DAY[n]) {   // opens that day's game card (only the card links to the game)
-      var lbl = dayKey(DAY[n].at) === dayKey(now()) ? 'Today’s game:' : 'Latest game:';
+      var lbl = (dayKey(DAY[n].at) === dayKey(now()) ? 'Today’s ' : 'Latest ') + (DAY[n].games.length > 1 ? 'games:' : 'game:');
       chip.hidden = false;
       chip.dataset.n = String(n);
       $('#chipLbl').textContent = lbl;
-      $('#chipName').textContent = DAY[n].game.name;
-      chip.setAttribute('aria-label', lbl + ' ' + DAY[n].game.name);
+      $('#chipName').textContent = namesOf(DAY[n]);
+      chip.setAttribute('aria-label', lbl + ' ' + namesOf(DAY[n]));
     } else chip.hidden = true;
     tickCountdown(true);
   }
@@ -1318,9 +1322,12 @@
     (r.strokes || []).forEach(function (s) { add(s.c); });
     return cols.slice(0, 8);
   }
-  function preloadShot(n) { var d = DAY[n]; if (d && d.game.img) { var im = new Image(); im.src = d.game.img; } }
-  function gameTiles(g) {
-    var art = $('#gameArt'); art.textContent = '';
+  function preloadShot(n) {
+    var d = DAY[n]; if (!d) return;
+    d.games.forEach(function (g) { [].concat(g.img || []).forEach(function (src) { var im = new Image(); im.src = src; }); });
+  }
+  function gameTiles(g) {   // no screenshot: three little letter tiles instead
+    var art = document.createElement('div'); art.className = 'game-art';
     var letters = (g.name.replace(/[^A-Za-z0-9]/g, '').toUpperCase() + '???').slice(0, 3).split('');
     var pos = [[6, 30, -12], [26, 8, 4], [46, 32, 14]];
     letters.forEach(function (ch, i) {
@@ -1329,6 +1336,7 @@
       t.style.transform = 'rotate(' + pos[i][2] + 'deg)'; t.style.animationDelay = (i * 0.09) + 's';
       art.appendChild(t);
     });
+    return art;
   }
   function setShot(shot, url, src, fallback) {   // a screenshot in a little browser window
     var img = $('img', shot);
@@ -1344,14 +1352,48 @@
       if (img.complete && img.naturalWidth) img.classList.add('ok');
     }
   }
-  function showShot(g) {
-    var shot = $('#rvShot'), art = $('#gameArt');
-    art.hidden = true;
-    setShot(shot, g.url, g.img, function () { shot.hidden = true; art.hidden = false; gameTiles(g); });
+  // a game's screenshot in a little browser window (or a phone, for an app game); several pictures take turns
+  function shotFor(g, go) {
+    var srcs = [].concat(g.img || []);
+    if (!srcs.length) return gameTiles(g);
+    var a = document.createElement('a');
+    a.className = 'shot' + (g.phone ? ' phone' : ''); a.href = g.url; a.target = '_blank'; a.rel = 'noopener'; a.tabIndex = -1;
+    if (!g.phone) {
+      var bar = document.createElement('span'); bar.className = 'bar'; bar.innerHTML = '<i></i><i></i><i></i><b></b>';
+      bar.lastChild.textContent = hostOf(g.url); a.appendChild(bar);
+    }
+    var pic = document.createElement('span'); pic.className = 'pic' + (srcs.length > 1 ? ' slides' : '');
+    srcs.forEach(function (src, i) {
+      var im = document.createElement('img'); im.alt = ''; im.decoding = 'async';
+      if (!i) im.classList.add('on');
+      im.onload = function () { im.classList.add('ok'); };
+      im.onerror = function () { if (srcs.length === 1 && a.parentNode) a.parentNode.replaceChild(gameTiles(g), a); else im.remove(); };
+      im.src = src;
+      if (im.complete && im.naturalWidth) im.classList.add('ok');
+      pic.appendChild(im);
+    });
+    a.appendChild(pic);
+    a.onclick = go;
+    return a;
+  }
+  var slideTimer = 0;
+  function startSlides() {   // app screenshots cross-fade every few seconds while the card is open
+    clearInterval(slideTimer); slideTimer = 0;
+    var shows = $$('#rvPics .pic.slides');
+    if (reduceMotion || !shows.length) return;
+    slideTimer = setInterval(function () {
+      if (!$('#revealSheet').classList.contains('on')) { clearInterval(slideTimer); slideTimer = 0; return; }
+      shows.forEach(function (p) {
+        var ims = $$('img', p); if (ims.length < 2) return;
+        var i = 0; ims.forEach(function (x, k) { if (x.classList.contains('on')) i = k; });
+        ims[i].classList.remove('on'); ims[(i + 1) % ims.length].classList.add('on');
+      });
+    }, 2800);
   }
   function playIn(el) { el.classList.remove('anim'); void el.offsetWidth; if (!reduceMotion) el.classList.add('anim'); }
   function fillReveal(n, fresh) {
-    var d = DAY[n], g = d.game, today = fresh || dayKey(d.at) === dayKey(now());
+    var d = DAY[n], gs = d.games, today = fresh || dayKey(d.at) === dayKey(now());
+    var go = guardLinks(function () { markOpened(n); });
     var dl = $('#rvDay'); dl.textContent = 'Day ' + n + ' · ' + fmtDate(d.at);
     var cols = dayColours(n);
     if (cols.length) {
@@ -1359,16 +1401,43 @@
       cols.forEach(function (c) { var i = document.createElement('i'); i.style.background = c; dots.appendChild(i); });
       dl.appendChild(dots);
     }
+    $('#rvTag').textContent = gs.length > 1 ? '✨ Games of the day ✨' : '✨ Game of the day ✨';
+    var pics = $('#rvPics'); pics.textContent = ''; pics.className = 'pics' + (gs.length > 1 ? ' two' : '');
+    gs.forEach(function (g) { pics.appendChild(shotFor(g, go)); });
+    // "We’re playing Angle and Connections today!" — each game's name links to it ("say" = how to say it, e.g. "a PUBG match")
     var h = $('#rvTitle'); h.textContent = '';
-    var link = document.createElement('a'); link.href = g.url; link.target = '_blank'; link.rel = 'noopener'; link.textContent = g.name;
     h.appendChild(document.createTextNode(today ? 'We’re playing ' : 'We played '));
-    h.appendChild(link);
+    gs.forEach(function (g, i) {
+      if (i) h.appendChild(document.createTextNode(i === gs.length - 1 ? ' and ' : ', '));
+      var say = g.say || g.name, k = say.indexOf(g.name), part = document.createElement('span');   // kept on one line
+      var link = document.createElement('a'); link.href = g.url; link.target = '_blank'; link.rel = 'noopener'; link.onclick = go;
+      link.textContent = k >= 0 ? g.name : say;
+      part.className = 'nb';
+      if (k > 0) part.appendChild(document.createTextNode(say.slice(0, k)));
+      part.appendChild(link);
+      if (k >= 0 && k + g.name.length < say.length) part.appendChild(document.createTextNode(say.slice(k + g.name.length)));
+      h.appendChild(part);
+    });
     h.appendChild(document.createTextNode(today ? ' today!' : '!'));
-    $('#rvPlay').href = g.url;
-    $('#rvBlurb').textContent = g.blurb || '';
-    showShot(g);
-    var go = guardLinks(function () { markOpened(n); });
-    link.onclick = go; $('#rvPlay').onclick = go; $('#rvShot').onclick = go;
+    var bl = $('#rvBlurb'); bl.textContent = '';
+    if (gs.length === 1) bl.textContent = gs[0].blurb || '';
+    else gs.forEach(function (g) {
+      if (!g.blurb) return;
+      var line = document.createElement('span'), b = document.createElement('b');
+      line.className = 'bl'; b.textContent = g.name;
+      line.appendChild(b); line.appendChild(document.createTextNode(' · ' + g.blurb)); bl.appendChild(line);
+    });
+    var play = $('#rvPlay'), plays = $('#rvPlays');
+    plays.textContent = '';
+    play.hidden = gs.length > 1; plays.hidden = gs.length < 2;
+    if (gs.length === 1) { play.href = gs[0].url; play.onclick = go; }
+    else gs.forEach(function (g) {   // one button per game
+      var a = document.createElement('a'); a.className = 'btn'; a.href = g.url; a.target = '_blank'; a.rel = 'noopener'; a.onclick = go;
+      a.innerHTML = '<span></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>';
+      a.firstChild.textContent = g.name;
+      plays.appendChild(a);
+    });
+    startSlides();
   }
   // slides up: right after a day is locked in, or after tapping that day on the picture
   function showReveal(n, fresh) {
@@ -1446,12 +1515,12 @@
       var b = document.createElement('b'), s = document.createElement('span');
       if (isDone(d.n)) {
         var c = mainColour(d.n); dot.style.background = c; dot.style.color = contrastInk(c);
-        b.textContent = d.game.name; s.textContent = 'Day ' + d.n + ' · ' + fmtDate(d.at);
+        b.textContent = namesOf(d); s.textContent = 'Day ' + d.n + ' · ' + fmtDate(d.at);
         var more = document.createElement('span'); more.className = 'more';
         more.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 6.5 15 12l-5.5 5.5"/></svg>';
         meta.appendChild(b); meta.appendChild(s); li.appendChild(dot); li.appendChild(meta); li.appendChild(more);
         li.className = 'tap';   // opens that day's game card on top of the shelf (the card links to the game)
-        li.tabIndex = 0; li.setAttribute('role', 'button'); li.setAttribute('aria-label', 'Day ' + d.n + ': ' + d.game.name);
+        li.tabIndex = 0; li.setAttribute('role', 'button'); li.setAttribute('aria-label', 'Day ' + d.n + ': ' + namesOf(d));
         li.addEventListener('click', function () { openCard(d.n, li, $('#shelfSheet')); });
         li.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); li.click(); } });
       } else {

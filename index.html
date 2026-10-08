@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=6">
+<link rel="stylesheet" href="css/styles.css?v=7">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i></div>
@@ -137,16 +137,13 @@
 <div class="sheet" id="revealSheet" role="dialog" aria-modal="true" aria-labelledby="rvTitle">
   <div class="grab"></div>
   <div class="reveal" id="reveal">
-    <a class="shot" id="rvShot" href="#" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true" hidden>
-      <span class="bar"><i></i><i></i><i></i><b id="rvHost"></b></span>
-      <span class="pic"><img id="rvImg" alt="" decoding="async"></span>
-    </a>
-    <div class="game-art" id="gameArt" aria-hidden="true"></div>
-    <div class="tag">✨ Game of the day ✨</div>
+    <div class="pics" id="rvPics" aria-hidden="true"></div>
+    <div class="tag" id="rvTag">✨ Game of the day ✨</div>
     <div class="dayline" id="rvDay"></div>
     <h2 id="rvTitle">We’re playing <a href="#" target="_blank" rel="noopener">Wordle</a> today!</h2>
     <p class="blurb" id="rvBlurb"></p>
     <a class="btn wide" id="rvPlay" href="#" target="_blank" rel="noopener">Let's play <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+    <div class="plays" id="rvPlays" hidden></div>
     <button class="linkbtn" id="rvBack">Back to my picture</button>
   </div>
 </div>
@@ -188,9 +185,9 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <canvas id="fx" aria-hidden="true"></canvas>
 
-<script src="js/config.js?v=6"></script>
-<script src="js/art.js?v=6"></script>
-<script src="js/hand.js?v=6"></script>
-<script src="js/app.js?v=6"></script>
+<script src="js/config.js?v=7"></script>
+<script src="js/art.js?v=7"></script>
+<script src="js/hand.js?v=7"></script>
+<script src="js/app.js?v=7"></script>
 </body>
 </html>

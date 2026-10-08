@@ -297,7 +297,27 @@ a { color: inherit; }
 .reveal h2 a { color: var(--coral-deep); text-decoration: none; background: linear-gradient(transparent 62%, var(--coral-soft) 62%); padding: 0 2px; border-radius: 4px; }
 .reveal .blurb { margin: 0 auto 20px; max-width: 340px; color: var(--ink-soft); font-weight: 600; font-size: 16px; line-height: 1.45; }
 .reveal .game-art { width: 92px; height: 92px; margin: 2px auto 4px; position: relative; }
-.reveal .game-art[hidden] { display: none; }
+/* the game's picture(s): one screenshot, two fanned out (two games), or a phone for an app game */
+.pics { display: flex; justify-content: center; align-items: flex-start; margin: 0 auto 16px; }
+.pics .shot, .pics .game-art { margin: 0; }
+.pics.two .shot { --shot-w: clamp(118px, 19vh, 166px); }
+.pics.two .shot:first-child { position: relative; z-index: 1; transform: rotate(-6deg) translate(12px, 6px); }
+.pics.two .shot:last-child { transform: rotate(5deg) translate(-12px, 0); }
+.reveal.anim .pics .shot + .shot { animation-delay: .1s; }
+.pics.two .shot:first-child:active { transform: rotate(-6deg) translate(12px, 6px) scale(.97); }
+.pics.two .shot:last-child:active { transform: rotate(5deg) translate(-12px, 0) scale(.97); }
+.shot.phone { width: var(--phone-w, min(290px, 76vw)); padding: 7px; border-radius: 24px; background: #26222a;
+  box-shadow: 0 16px 34px rgba(40, 25, 20, .3), 0 2px 6px rgba(40, 25, 20, .2), inset 0 0 0 1.5px rgba(255, 255, 255, .08); }
+.shot.phone .pic { aspect-ratio: 860 / 390; border-radius: 17px; background: #1b181d; animation: none; }
+.shot.phone img { object-position: center; }
+.shot .pic.slides img { position: absolute; inset: 0; transition: opacity .7s ease; }
+.shot .pic.slides img:not(.on) { opacity: 0; }
+.reveal .blurb .bl { display: block; }
+.reveal .blurb .bl + .bl { margin-top: 6px; }
+.reveal .blurb b { color: var(--ink); font-weight: 800; }
+.reveal .plays { display: flex; gap: 10px; }
+.reveal .plays .btn { flex: 1 1 0; min-width: 0; padding: 0 12px; font-size: 16px; }
+.reveal .plays .btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reveal .dayline .dots { display: inline-flex; gap: 3px; margin-left: 8px; vertical-align: -1px; }
 .reveal .dayline .dots i { width: 11px; height: 11px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(59, 51, 48, .14); }
 /* the game's screenshot, in a little browser window */
@@ -329,7 +349,7 @@ a { color: inherit; }
 /* the grand prize: a gift pops open, then the card */
 .prize .tag { background: linear-gradient(90deg, var(--butter), #ffb8a8); }
 .reveal.prize h2 { font-size: clamp(22px, 7.5vw, 34px); }      /* small enough that the resort's name always fits on its line */
-.prize h2 .nb { white-space: nowrap; }
+.reveal h2 .nb { white-space: nowrap; }
 .prize-pic { position: relative; }
 .prize .shot { position: relative; z-index: 1; }
 .prize.opened .gift { z-index: 0; }      /* the prize bursts out in front of the box */
@@ -422,7 +442,8 @@ body.has-pv .app { padding-top: calc(env(safe-area-inset-top) + 30px); }
   .sheet { max-width: 660px; max-height: 94%; }
   .reveal { display: grid; grid-template-columns: auto 1fr; column-gap: 24px; align-items: center; text-align: left; padding-top: 2px; }
   .reveal > * { grid-column: 2; }
-  .reveal .shot, .reveal .game-art, .reveal .prize-pic { grid-column: 1; grid-row: 1 / span 6; --shot-w: 150px; margin: 0; }
+  .reveal .pics, .reveal .prize-pic { grid-column: 1; grid-row: 1 / span 6; --shot-w: 150px; --phone-w: 250px; margin: 0; }
+  .reveal .pics.two .shot { --shot-w: 120px; }
   .reveal .tag, .reveal .linkbtn { justify-self: start; }
   .reveal h2, .reveal.prize h2 { margin: 6px 0; font-size: 26px; }
   .reveal .blurb { margin: 0 0 12px; }
@@ -443,6 +464,7 @@ body.has-pv .app { padding-top: calc(env(safe-area-inset-top) + 30px); }
   .cd-box { height: 46px; min-width: 50px; font-size: 26px; }
   .mixer { --mx-h: 60px; }
   .shot { --shot-w: clamp(130px, 23vh, 180px); margin-bottom: 12px; }
+  .pics { margin-bottom: 12px; }
   .reveal { padding-top: 8px; }
   .reveal h2 { margin-top: 6px; }
 }

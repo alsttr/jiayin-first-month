@@ -34,15 +34,22 @@ window.CONFIG = {
      date  : the day it unlocks (YYYY-MM-DD, unlocks at 6pm SGT that day)
      game  : name, link and a one-line description shown after she locks it in.
              img = a screenshot of the game (in assets/games/) shown with it — optional.
+                   Several pictures (img: ['a.jpg', 'b.jpg']) take turns; phone: true shows them in a phone.
+             say = how the card says it, if not just the name ("We're playing a PUBG match today!").
              Links go to each game's home page (not straight into the day's puzzle).
+     games : instead of game, for a day with more than one — games: [ {...}, {...} ].
      Thursdays use the shorter games.
      ------------------------------------------------------------------------ */
   days: [
     { n: 1,  date: '2026-10-05', game: { name: 'Wordle',      url: 'https://www.nytimes.com/games/wordle/index.html',   img: 'assets/games/wordle.jpg',      blurb: 'The classic. Guess the five-letter word in six tries.' } },
     { n: 2,  date: '2026-10-06', game: { name: 'Squaredle',   url: 'https://squaredle.app/',                            img: 'assets/games/squaredle.jpg',   blurb: 'Boggle-style word hunt: swipe through the letter grid to find every hidden word.' } },
     { n: 3,  date: '2026-10-07', game: { name: 'Betweenle',   url: 'https://betweenle.com/',                            img: 'assets/games/betweenle.jpg',   blurb: 'The secret word hides alphabetically between two others. Squeeze it out.' } },
-    { n: 4,  date: '2026-10-08', game: { name: 'Angle',       url: 'https://angle.wtf/',                                img: 'assets/games/angle.jpg',       blurb: 'Guess the angle in four tries. Thirty seconds, tops.' } },
-    { n: 5,  date: '2026-10-09', game: { name: 'Connections', url: 'https://www.nytimes.com/games/connections',         img: 'assets/games/connections.jpg', blurb: 'Sort sixteen words into four secret groups.' } },
+    { n: 4,  date: '2026-10-08', games: [
+        { name: 'Angle',       url: 'https://angle.wtf/',                                img: 'assets/games/angle.jpg',       blurb: 'Guess the angle in four tries. Thirty seconds, tops.' },
+        { name: 'Connections', url: 'https://www.nytimes.com/games/connections',         img: 'assets/games/connections.jpg', blurb: 'Sort sixteen words into four secret groups.' } ] },
+    { n: 5,  date: '2026-10-09', game: { name: 'PUBG match', say: 'a PUBG match', url: 'https://www.pubgmobile.com/en-US/home.shtml', phone: true,
+        img: ['assets/games/pubg-1.jpg', 'assets/games/pubg-2.jpg', 'assets/games/pubg-3.jpg', 'assets/games/pubg-4.jpg'],
+        blurb: 'Squad up, drop in together and go for that chicken dinner. 🍗' } },
     { n: 6,  date: '2026-10-10', game: { name: 'TimeGuessr',  url: 'https://timeguessr.com/',                           img: 'assets/games/timeguessr.jpg',  blurb: 'Five photos from history — guess where and when each was taken.' } },
     { n: 7,  date: '2026-10-12', game: { name: 'Word-leh!',   url: 'https://word-leh.com/',                             img: 'assets/games/word-leh.jpg',    blurb: 'Wordle, but make it Singlish. Steady lah.' } },
     { n: 8,  date: '2026-10-13', game: { name: 'Krillion',    url: 'https://krillion.io/',                              img: 'assets/games/krillion.jpg',    blurb: 'Seven prompts, 25 seconds each — the rarer your answer, the deeper you dive.' } },

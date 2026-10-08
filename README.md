@@ -28,8 +28,8 @@ Unlocks at 6pm SGT on each date. Thursdays have the shorter games. 🇸🇬 = Si
 | 1 | Mon 5 Oct | sun | [Wordle](https://www.nytimes.com/games/wordle/index.html) | already coloured |
 | 2 | Tue 6 Oct | snow caps | [Squaredle](https://squaredle.app/) | Boggle-style word search |
 | 3 | Wed 7 Oct | mountain | [Betweenle](https://betweenle.com/) |  |
-| 4 | Thu 8 Oct | right tree trunk | [Angle](https://angle.wtf/) | short (Thu) |
-| 5 | Fri 9 Oct | left tree trunk | [Connections](https://www.nytimes.com/games/connections) |  |
+| 4 | Thu 8 Oct | right tree trunk | [Angle](https://angle.wtf/) + [Connections](https://www.nytimes.com/games/connections) | two in one day |
+| 5 | Fri 9 Oct | left tree trunk | a PUBG match ([PUBG Mobile](https://www.pubgmobile.com/en-US/home.shtml)) | together, on your phones |
 | 6 | Sat 10 Oct | left tree leaves | [TimeGuessr](https://timeguessr.com/) | the weekend one |
 | 7 | Mon 12 Oct | right tree leaves | [Word-leh!](https://word-leh.com/) | 🇸🇬 Singlish Wordle |
 | 8 | Tue 13 Oct | 1 fruit | [Krillion](https://krillion.io/) |  |
@@ -70,6 +70,9 @@ Everything editable is in **`js/config.js`** (plain text, commented):
 
 * **Dates / unlock time** — `days[].date`, `unlockHour`.
 * **Games** — `days[].game` (`name`, `url`, `blurb`, and `img`: the screenshot shown with it, in `assets/games/`).
+  A day with two games uses `games: [ {...}, {...} ]` instead (the card shows both, with a button each).
+  `say` changes how the card names it ("We're playing **a PUBG match** today!"); `img` can be a list of pictures
+  that take turns, and `phone: true` shows them in a phone (for app games).
   Keep `url` on the game's home page rather than a link that starts the day's game.
   To swap a game's picture, drop any phone screenshot of it in `assets/games/` (portrait, roughly 480×600 JPG is plenty)
   and point `img` at it; delete the `img` line and the card shows little letter tiles instead.
@@ -86,7 +89,7 @@ Then publish the change (from this folder):
 git add -A && git commit -m "Update schedule" && git push
 ```
 
-GitHub Pages updates the live site in about a minute. (Tip: bump the `?v=6` numbers in `index.html`
+GitHub Pages updates the live site in about a minute. (Tip: bump the `?v=7` numbers in `index.html`
 when you change CSS/JS so phones fetch the fresh files straight away.) Edits to games/dates never erase what she has already
 coloured — that lives in the database (and on her phone).
 
